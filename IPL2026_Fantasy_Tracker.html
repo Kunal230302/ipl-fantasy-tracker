@@ -844,7 +844,7 @@ function showAlert(id,msg,type){var e=document.getElementById(id);e.textContent=
 // ═══════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════
-function getEntries(){var g=state.groups[state.activeGroup];return g?g.entries:[];}
+function getEntries(){var g=state.groups[state.activeGroup];return (g&&g.entries)?g.entries:[];}
 
 function renderAll(){renderMetrics();renderDashLB();renderRecent();populateMemberRows();renderEntries();renderLeaderboard();renderPDFSelect();renderInvite();renderSchedule();}
 
