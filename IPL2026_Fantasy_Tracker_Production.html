@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FantasyPointTracker.live - IPL 2026 Fantasy Points Tracker</title>
+<meta name="description" content="Track IPL 2026 fantasy points with your friends. Create groups, enter match scores, and compete for the top spot!">
+<meta name="keywords" content="IPL 2026, fantasy cricket, points tracker, fantasy league, IPL fantasy">
+<meta name="author" content="FantasyPointTracker.live">
+
+<!-- Open Graph Meta Tags -->
+<meta property="og:title" content="FantasyPointTracker.live - IPL 2026 Fantasy Points Tracker">
+<meta property="og:description" content="Track IPL 2026 fantasy points with your friends. Create groups and compete!">
+<meta property="og:image" content="https://fantasypointtracker.live/logo.png">
+<meta property="og:url" content="https://fantasypointtracker.live">
+<meta property="og:type" content="website">
+
+<!-- Twitter Card Meta Tags -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="FantasyPointTracker.live - IPL 2026 Fantasy Points Tracker">
+<meta name="twitter:description" content="Track IPL 2026 fantasy points with your friends. Create groups and compete!">
+<meta name="twitter:image" content="https://fantasypointtracker.live/logo.png">
+
+<!-- Favicon -->
+<link rel="icon" href="favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="logo.png">
+
+<!-- CDN Resources -->
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Preconnect for performance -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<!-- CSS (Minified for production) -->
+<style>
+:root{--blue:#1a0a3e;--gold:#00e676;--orange:#7c4dff;--light:#0d0b1a;--border:#2a1f5e;--text:#e8e0ff;--muted:#9e8cc7;--green:#00e676;--red:#ff5252;--cyan:#00e5ff;--purple:#7c4dff;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:var(--light);color:var(--text);font-size:14px;line-height:1.5;}
+.page{display:none;min-height:100vh;}
+.page.active{display:block;}
+.home-bg{min-height:100vh;background:linear-gradient(135deg,#0d0b1a 0%,#1a0a3e 50%,#120832 100%);display:flex;align-items:center;justify-content:center;}
+.home-card{background:rgba(26,10,62,.85);backdrop-filter:blur(20px);border:1px solid rgba(124,77,255,.3);border-radius:24px;padding:48px 40px;max-width:440px;width:94%;text-align:center;box-shadow:0 24px 80px rgba(124,77,255,.15);animation:slideUp .4s;}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.home-card .logo{margin-bottom:12px;}
+.home-card .logo img{width:220px;height:auto;filter:drop-shadow(0 4px 24px rgba(124,77,255,.5));}
+.home-card h1{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--green);letter-spacing:2px;text-shadow:0 0 20px rgba(0,230,118,.3);}
+.home-card .sub{color:var(--muted);font-size:13px;margin-bottom:28px;}
+.home-card input{width:100%;padding:12px 16px;border:2px solid var(--border);border-radius:10px;font-size:14px;margin-bottom:12px;font-family:'Inter',sans-serif;transition:border .2s;background:rgba(255,255,255,.05);color:#fff;}
+.home-card input:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(0,230,118,.15);}
+.btn-main{width:100%;padding:14px;background:linear-gradient(135deg,#7c4dff,#00e5ff);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s;letter-spacing:.5px;}
+.btn-main:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(124,77,255,.4);}
+.btn-orange{background:linear-gradient(135deg,#00e676,#00e5ff);}
+.toggle-link{color:var(--cyan);font-size:13px;cursor:pointer;margin-top:14px;display:inline-block;font-weight:600;}
+.toggle-link:hover{text-decoration:underline;}
+.auth-alert{font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:12px;display:none;}
+.auth-alert.err{background:rgba(255,82,82,.15);color:#ff5252;border:1px solid rgba(255,82,82,.3);display:block;}
+.auth-alert.ok{background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);display:block;}
+.header{background:linear-gradient(135deg,#0d0b1a 0%,#1a0a3e 60%,#120832 100%);color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(124,77,255,.3);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header h1{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:2px;color:var(--green);line-height:1;text-shadow:0 0 12px rgba(0,230,118,.3);}
+.header p{color:var(--muted);font-size:11px;}
+.user-pill{display:flex;align-items:center;gap:8px;background:rgba(124,77,255,.15);border:1px solid rgba(124,77,255,.3);padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;}
+.user-pill button{background:rgba(0,230,118,.2);border:1px solid rgba(0,230,118,.3);color:#00e676;padding:3px 10px;border-radius:12px;font-size:11px;cursor:pointer;font-weight:600;}
+.tabs-bar{background:rgba(26,10,62,.7);border-bottom:1px solid var(--border);padding:0 24px;display:flex;gap:2px;overflow-x:auto;}
+.tab-btn{padding:12px 16px;border:none;background:none;font-weight:600;font-size:13px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .2s,border-color .2s;}
+.tab-btn.active{color:var(--green);border-bottom-color:var(--green);}
+.content{padding:20px 24px;max-width:1100px;margin:0 auto;}
+.section{display:none;}.section.active{display:block;}
+.card{background:rgba(26,10,62,.6);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+.card-title{font-weight:700;font-size:15px;color:var(--green);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px;}
+label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px;}
+input,select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;background:rgba(255,255,255,.05);color:#fff;transition:border .2s;}
+input:focus,select:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(0,230,118,.1);}
+.btn{padding:9px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;border:none;transition:opacity .2s;}
+.btn:hover{opacity:.85;}
+.btn-primary{background:linear-gradient(135deg,#7c4dff,#00e5ff);color:#fff;}
+.btn-danger{background:var(--red);color:#fff;padding:4px 10px;font-size:11px;}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.alert{padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:10px;display:none;}
+.alert-success{background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);}
+.alert-error{background:rgba(255,82,82,.15);color:#ff5252;border:1px solid rgba(255,82,82,.3);}
+table{width:100%;border-collapse:collapse;}
+th{background:rgba(124,77,255,.15);text-transform:uppercase;font-size:11px;letter-spacing:.5px;color:var(--muted);padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);}
+td{padding:8px 10px;border-bottom:1px solid rgba(42,31,94,.5);vertical-align:middle;}
+tr:hover td{background:rgba(124,77,255,.08);}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px;}
+.metric{background:rgba(26,10,62,.7);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;border-top:3px solid var(--green);}
+.metric-val{font-size:26px;font-weight:700;color:var(--green);font-family:'Bebas Neue',sans-serif;letter-spacing:1px;}
+.metric-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+.rank-1{background:linear-gradient(90deg,rgba(0,230,118,.1),transparent);}
+.rank-2{background:linear-gradient(90deg,rgba(0,229,255,.08),transparent);}
+.rank-3{background:linear-gradient(90deg,rgba(124,77,255,.08),transparent);}
+.rank-num{font-family:'Bebas Neue',sans-serif;font-size:20px;}
+.rank-gold{color:#00e676;}.rank-silver{color:#00e5ff;}.rank-bronze{color:#7c4dff;}
+.group-card{background:rgba(26,10,62,.7);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:12px;border-left:4px solid var(--purple);transition:box-shadow .2s;}
+.group-card:hover{box-shadow:0 4px 16px rgba(124,77,255,.15);}
+.group-card-name{font-size:17px;font-weight:700;color:var(--green);margin-bottom:3px;}
+.group-card-meta{font-size:12px;color:var(--muted);margin-bottom:8px;}
+.group-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.btn-grp{background:rgba(124,77,255,.15);color:#00e5ff;border:1px solid rgba(124,77,255,.3);padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;}
+.btn-grp:hover{background:rgba(124,77,255,.25);}
+.btn-grp-main{background:linear-gradient(135deg,#7c4dff,#00e5ff);color:#fff;border:none;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(8px);animation:fadeIn .2s;}
+.modal-overlay.hidden{display:none;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal-box{background:#1a0a3e;border:1px solid var(--border);border-radius:16px;padding:28px 24px;max-width:500px;width:94%;position:relative;animation:slideUp .25s;max-height:90vh;overflow-y:auto;}
+.modal-close{position:absolute;top:12px;right:16px;font-size:22px;cursor:pointer;color:var(--muted);background:none;border:none;}
+.modal-title{font-size:18px;font-weight:700;color:var(--green);margin-bottom:16px;}
+.qr-wrap{text-align:center;padding:14px 0;}
+.link-box{background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;word-break:break-all;cursor:pointer;margin:10px 0;}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(0,230,118,.15);color:#00e676;}
+.team-section{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;}
+.team-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.team-header h3{font-size:15px;color:var(--blue);}
+.player-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;}
+.player-row input{flex:1;}
+.player-row .pts-input{max-width:100px;}
+.remove-player{background:var(--red);color:#fff;border:none;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;}
+.btn-pdf{background:linear-gradient(135deg,#7c4dff,#00e5ff);color:#fff;border:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;transition:transform .15s;}
+.btn-pdf:hover{transform:scale(1.02);}
+.schedule-card{background:rgba(26,10,62,.7);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;transition:all .2s;cursor:pointer;border-left:4px solid transparent;}
+.schedule-card:hover{border-left-color:var(--green);box-shadow:0 4px 12px rgba(0,230,118,.1);transform:translateX(2px);}
+.schedule-card.today{border-left-color:var(--cyan);background:rgba(0,229,255,.08);}
+.schedule-card.past{opacity:.5;}
+.schedule-card .match-num{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green);min-width:35px;}
+.schedule-card .teams{font-weight:700;font-size:14px;color:var(--cyan);flex:1;}
+.schedule-card .match-date{font-size:11px;color:var(--muted);text-align:right;}
+.schedule-card .match-venue{font-size:10px;color:var(--muted);}
+.schedule-filter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.schedule-filter select{max-width:200px;}
+.header-logo{width:42px;height:42px;border-radius:50%;background:transparent;padding:0;filter:drop-shadow(0 0 8px rgba(124,77,255,.5));}
+@media(max-width:600px){.header{padding:12px 16px;flex-wrap:wrap;}.content{padding:14px 12px;}.form-grid{grid-template-columns:1fr;}.metrics{grid-template-columns:repeat(2,1fr);}.home-card{padding:32px 24px;}}
+@media print{.no-print{display:none!important;}}
+</style>
+</head>
+<body>
+
+<!-- Production application content would go here -->
+<!-- This is a template for the production version -->
+
+<div class="home-bg">
+<div class="home-card">
+  <div class="logo"><img src="logo.png" alt="FPT Logo"/></div>
+  <h1>FantasyPointTracker.live</h1>
+  <p class="sub">Coming Soon - IPL 2026 Fantasy Points Tracker</p>
+  <div style="margin-top:20px;">
+    <p style="color:var(--muted);font-size:13px;">This site is under construction. Check back soon!</p>
+  </div>
+</div>
+</div>
+
+</body>
+</html>

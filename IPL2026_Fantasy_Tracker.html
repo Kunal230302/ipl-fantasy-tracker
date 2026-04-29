@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FantasyPointTracker.live - IPL 2026 Fantasy Points Tracker</title>
+<link rel="icon" href="favicon.png" type="image/png">
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--blue:#1a0a3e;--gold:#00e676;--orange:#7c4dff;--light:#0d0b1a;--border:#2a1f5e;--text:#e8e0ff;--muted:#9e8cc7;--green:#00e676;--red:#ff5252;--cyan:#00e5ff;--purple:#7c4dff;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:var(--light);color:var(--text);font-size:14px;line-height:1.5;}
+
+/* PAGES */
+.page{display:none;min-height:100vh;}
+.page.active{display:block;}
+
+/* HOME */
+.home-bg{min-height:100vh;background:linear-gradient(135deg,#0d0b1a 0%,#1a0a3e 50%,#120832 100%);display:flex;align-items:center;justify-content:center;}
+.home-card{background:rgba(26,10,62,.85);backdrop-filter:blur(20px);border:1px solid rgba(124,77,255,.3);border-radius:24px;padding:48px 40px;max-width:440px;width:94%;text-align:center;box-shadow:0 24px 80px rgba(124,77,255,.15);animation:slideUp .4s;}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
+.home-card .logo{margin-bottom:12px;}
+.home-card .logo img{width:220px;height:auto;filter:drop-shadow(0 4px 24px rgba(124,77,255,.5));}
+.home-card h1{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--green);letter-spacing:2px;text-shadow:0 0 20px rgba(0,230,118,.3);}
+.home-card .sub{color:var(--muted);font-size:13px;margin-bottom:28px;}
+.home-card input{width:100%;padding:12px 16px;border:2px solid var(--border);border-radius:10px;font-size:14px;margin-bottom:12px;font-family:'Inter',sans-serif;transition:border .2s;background:rgba(255,255,255,.05);color:#fff;}
+.home-card input:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(0,230,118,.15);}
+.btn-main{width:100%;padding:14px;background:linear-gradient(135deg,#7c4dff,#00e5ff);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:transform .15s,box-shadow .15s;letter-spacing:.5px;}
+.btn-main:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(124,77,255,.4);}
+.btn-orange{background:linear-gradient(135deg,#00e676,#00e5ff);}
+.toggle-link{color:var(--cyan);font-size:13px;cursor:pointer;margin-top:14px;display:inline-block;font-weight:600;}
+.toggle-link:hover{text-decoration:underline;}
+.auth-alert{font-size:13px;padding:8px 12px;border-radius:8px;margin-bottom:12px;display:none;}
+.auth-alert.err{background:rgba(255,82,82,.15);color:#ff5252;border:1px solid rgba(255,82,82,.3);display:block;}
+.auth-alert.ok{background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);display:block;}
+
+/* HEADER */
+.header{background:linear-gradient(135deg,#0d0b1a 0%,#1a0a3e 60%,#120832 100%);color:#fff;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid rgba(124,77,255,.3);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header h1{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:2px;color:var(--green);line-height:1;text-shadow:0 0 12px rgba(0,230,118,.3);}
+.header p{color:var(--muted);font-size:11px;}
+.user-pill{display:flex;align-items:center;gap:8px;background:rgba(124,77,255,.15);border:1px solid rgba(124,77,255,.3);padding:6px 14px;border-radius:20px;font-size:13px;font-weight:600;}
+.user-pill button{background:rgba(0,230,118,.2);border:1px solid rgba(0,230,118,.3);color:#00e676;padding:3px 10px;border-radius:12px;font-size:11px;cursor:pointer;font-weight:600;}
+
+/* TABS */
+.tabs-bar{background:rgba(26,10,62,.7);border-bottom:1px solid var(--border);padding:0 24px;display:flex;gap:2px;overflow-x:auto;}
+.tab-btn{padding:12px 16px;border:none;background:none;font-weight:600;font-size:13px;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .2s,border-color .2s;}
+.tab-btn.active{color:var(--green);border-bottom-color:var(--green);}
+
+/* CONTENT */
+.content{padding:20px 24px;max-width:1100px;margin:0 auto;}
+.section{display:none;}.section.active{display:block;}
+.card{background:rgba(26,10,62,.6);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+.card-title{font-weight:700;font-size:15px;color:var(--green);margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:12px;}
+label{display:block;font-size:11px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px;}
+input,select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;background:rgba(255,255,255,.05);color:#fff;transition:border .2s;}
+input:focus,select:focus{outline:none;border-color:var(--green);box-shadow:0 0 0 3px rgba(0,230,118,.1);}
+.btn{padding:9px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;border:none;transition:opacity .2s;}
+.btn:hover{opacity:.85;}
+.btn-primary{background:linear-gradient(135deg,#7c4dff,#00e5ff);color:#fff;}
+.btn-danger{background:var(--red);color:#fff;padding:4px 10px;font-size:11px;}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.alert{padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:10px;display:none;}
+.alert-success{background:rgba(0,230,118,.15);color:#00e676;border:1px solid rgba(0,230,118,.3);}
+.alert-error{background:rgba(255,82,82,.15);color:#ff5252;border:1px solid rgba(255,82,82,.3);}
+
+/* TABLES */
+table{width:100%;border-collapse:collapse;}
+th{background:rgba(124,77,255,.15);text-transform:uppercase;font-size:11px;letter-spacing:.5px;color:var(--muted);padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);}
+td{padding:8px 10px;border-bottom:1px solid rgba(42,31,94,.5);vertical-align:middle;}
+tr:hover td{background:rgba(124,77,255,.08);}
+
+/* METRICS */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px;}
+.metric{background:rgba(26,10,62,.7);border:1px solid var(--border);border-radius:10px;padding:14px;text-align:center;border-top:3px solid var(--green);}
+.metric-val{font-size:26px;font-weight:700;color:var(--green);font-family:'Bebas Neue',sans-serif;letter-spacing:1px;}
+.metric-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+
+/* RANK */
+.rank-1{background:linear-gradient(90deg,rgba(0,230,118,.1),transparent);}
+.rank-2{background:linear-gradient(90deg,rgba(0,229,255,.08),transparent);}
+.rank-3{background:linear-gradient(90deg,rgba(124,77,255,.08),transparent);}
+.rank-num{font-family:'Bebas Neue',sans-serif;font-size:20px;}
+.rank-gold{color:#00e676;}.rank-silver{color:#00e5ff;}.rank-bronze{color:#7c4dff;}
+
+/* GROUP CARD */
+.group-card{background:rgba(26,10,62,.7);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:12px;border-left:4px solid var(--purple);transition:box-shadow .2s;}
+.group-card:hover{box-shadow:0 4px 16px rgba(124,77,255,.15);}
+.group-card-name{font-size:17px;font-weight:700;color:var(--green);margin-bottom:3px;}
+.group-card-meta{font-size:12px;color:var(--muted);margin-bottom:8px;}
+.group-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.btn-grp{background:rgba(124,77,255,.15);color:#00e5ff;border:1px solid rgba(124,77,255,.3);padding:5px 12px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;}
+.btn-grp:hover{background:rgba(124,77,255,.25);}
+.btn-grp-main{background:linear-gradient(135deg,#7c4dff,#00e5ff);color:#fff;border:none;}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(8px);animation:fadeIn .2s;}
+.modal-overlay.hidden{display:none;}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.modal-box{background:#1a0a3e;border:1px solid var(--border);border-radius:16px;padding:28px 24px;max-width:500px;width:94%;position:relative;animation:slideUp .25s;max-height:90vh;overflow-y:auto;}
+.modal-close{position:absolute;top:12px;right:16px;font-size:22px;cursor:pointer;color:var(--muted);background:none;border:none;}
+.modal-title{font-size:18px;font-weight:700;color:var(--green);margin-bottom:16px;}
+
+/* QR */
+.qr-wrap{text-align:center;padding:14px 0;}
+.link-box{background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;word-break:break-all;cursor:pointer;margin:10px 0;}
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:600;background:rgba(0,230,118,.15);color:#00e676;}
+
+/* PLAYER ENTRY */
+.team-section{border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;}
+.team-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+.team-header h3{font-size:15px;color:var(--blue);}
+.player-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;}
+.player-row input{flex:1;}
+.player-row .pts-input{max-width:100px;}
+.remove-player{background:var(--red);color:#fff;border:none;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;}
+
+/* PDF BTN */
+.btn-pdf{background:linear-gradient(135deg,#7c4dff,#00e5ff);color:#fff;border:none;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;transition:transform .15s;}
+.btn-pdf:hover{transform:scale(1.02);}
+
+/* SCHEDULE */
+.schedule-card{background:rgba(26,10,62,.7);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;transition:all .2s;cursor:pointer;border-left:4px solid transparent;}
+.schedule-card:hover{border-left-color:var(--green);box-shadow:0 4px 12px rgba(0,230,118,.1);transform:translateX(2px);}
+.schedule-card.today{border-left-color:var(--cyan);background:rgba(0,229,255,.08);}
+.schedule-card.past{opacity:.5;}
+.schedule-card .match-num{font-family:'Bebas Neue',sans-serif;font-size:18px;color:var(--green);min-width:35px;}
+.schedule-card .teams{font-weight:700;font-size:14px;color:var(--cyan);flex:1;}
+.schedule-card .match-date{font-size:11px;color:var(--muted);text-align:right;}
+.schedule-card .match-venue{font-size:10px;color:var(--muted);}
+.schedule-filter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.schedule-filter select{max-width:200px;}
+.header-logo{width:42px;height:42px;border-radius:50%;background:transparent;padding:0;filter:drop-shadow(0 0 8px rgba(124,77,255,.5));}
+
+@media(max-width:600px){
+  .header{padding:12px 16px;flex-wrap:wrap;}
+  .content{padding:14px 12px;}
+  .form-grid{grid-template-columns:1fr;}
+  .metrics{grid-template-columns:repeat(2,1fr);}
+  .home-card{padding:32px 24px;}
+}
+@media print{.no-print{display:none!important;}}
+</style>
+</head>
+<body>
+
+<!-- ══════ PAGE: HOME ══════ -->
+<div id="page-home" class="page active">
+<div class="home-bg">
+<div class="home-card">
+  <div class="logo"><img src="logo.png" alt="FPT Logo"/></div>
+  <h1>TATA IPL 2026</h1>
+  <p class="sub">Fantasy Points Tracker &bull; 74 Matches &bull; 10 Teams</p>
+  <div id="auth-alert" class="auth-alert"></div>
+  <div style="margin-top:8px;">
+    <button class="btn-main" onclick="googleSignIn()" style="display:flex;align-items:center;justify-content:center;gap:10px;">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20" style="background:#fff;border-radius:50%;padding:2px;"/>
+      Sign in with Google
+    </button>
+    <p style="color:var(--muted);font-size:11px;margin-top:14px;">Secure login via your Google account</p>
+  </div>
+</div>
+</div>
+</div>
+
+<!-- ══════ PAGE: GROUPS ══════ -->
+<div id="page-groups" class="page">
+<div class="header">
+  <div class="header-left"><img src="header-logo.png" class="header-logo"/><div><h1>FantasyPointTracker.live</h1><p>Choose or Create a Group</p></div></div>
+  <div class="user-pill" id="grp-user-pill">&#128100; <span id="grp-username"></span><button onclick="doLogout()">Logout</button></div>
+</div>
+<div class="content">
+  <div class="card">
+    <div class="card-title">&#128279; Create New Group</div>
+    <div id="grp-alert" class="alert"></div>
+    <div class="form-grid">
+      <div><label>Group Name</label><input id="cg-name" placeholder="e.g. Bhai Log Fantasy"/></div>
+    </div>
+    <button class="btn btn-primary" onclick="createGroup()">&#128279; Create Group</button>
+  </div>
+  <div class="card">
+    <div class="card-title">&#128101; Available Groups</div>
+    <div id="groups-list"></div>
+  </div>
+</div>
+</div>
+
+<!-- ══════ PAGE: APP (main tracker) ══════ -->
+<div id="page-app" class="page">
+<div class="header">
+  <div class="header-left"><img src="header-logo.png" class="header-logo"/><div><h1>FantasyPointTracker.live</h1><p id="app-group-name">Group</p></div></div>
+  <div style="display:flex;align-items:center;gap:10px;">
+    <div class="user-pill" id="app-user-pill">&#128100; <span id="app-username"></span><button onclick="doLogout()">Logout</button></div>
+    <button class="btn-grp" onclick="leaveGroup()">&#128281; Groups</button>
+  </div>
+</div>
+<div class="tabs-bar no-print">
+  <button class="tab-btn active" onclick="showTab('dashboard',this)">&#128202; Dashboard</button>
+  <button class="tab-btn" onclick="showTab('entry',this)">&#9999;&#65039; Match Entry</button>
+  <button class="tab-btn" onclick="showTab('leaderboard',this)">&#127941; Leaderboard</button>
+  <button class="tab-btn" onclick="showTab('invite',this)">&#128279; Invite</button>
+  <button class="tab-btn" onclick="showTab('pdf',this)">&#128196; PDF Export</button>
+  <button class="tab-btn" onclick="showTab('schedule',this)">&#128197; Schedule</button>
+</div>
+<div class="content">
+
+<!-- DASHBOARD -->
+<div id="sec-dashboard" class="section active">
+  <div class="metrics" id="metrics-bar"></div>
+  <div class="card"><div class="card-title">&#127941; Top 5 Leaderboard</div>
+    <table><thead><tr><th>#</th><th>Player</th><th>Matches</th><th>Total Pts</th></tr></thead><tbody id="dash-lb"></tbody></table>
+  </div>
+  <div class="card"><div class="card-title">&#128203; Recent Entries</div>
+    <table><thead><tr><th>Match</th><th>Player</th><th>Points</th></tr></thead><tbody id="dash-recent"></tbody></table>
+  </div>
+</div>
+
+<!-- MATCH ENTRY -->
+<div id="sec-entry" class="section">
+  <div class="card">
+    <div class="card-title">&#9999;&#65039; Enter Match Points (All Members)</div>
+    <div id="entry-alert" class="alert"></div>
+    <div class="form-grid">
+      <div><label>Match Name / Title</label><input id="m-name" placeholder="e.g. MI vs CSK"/></div>
+      <div><label>Match Number</label><input id="m-num" type="number" min="1" max="100" placeholder="e.g. 41"/></div>
+    </div>
+    <div style="margin-top:16px;">
+      <div style="font-weight:700;font-size:14px;color:var(--blue);margin-bottom:10px;">&#128101; Members &mdash; Enter each member's team &amp; points</div>
+      <table>
+        <thead><tr><th style="width:25%;">Member Name</th><th style="width:35%;">Team Name</th><th style="width:20%;">Total Points</th></tr></thead>
+        <tbody id="member-entry-rows"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:10px;">
+      <button class="btn btn-primary" onclick="submitMatch()" style="flex:1;">&#10004; Submit All Entries</button>
+      <button class="btn" style="background:#F1F5F9;color:var(--muted);" onclick="clearMatchForm()">Clear</button>
+    </div>
+  </div>
+  <div class="card"><div class="card-title">&#128203; All Match Entries</div>
+    <table><thead><tr><th>Match</th><th>Member</th><th>Team</th><th>Points</th><th class="no-print">&#128465;</th></tr></thead>
+    <tbody id="entries-body"></tbody></table>
+  </div>
+</div>
+
+<!-- LEADERBOARD -->
+<div id="sec-leaderboard" class="section">
+  <div class="card"><div class="card-title">&#127942; Group Leaderboard</div>
+    <table><thead><tr><th>#</th><th>Player</th><th>Matches</th><th>Total Pts</th><th>Avg/Match</th></tr></thead><tbody id="lb-group"></tbody></table>
+  </div>
+</div>
+
+<!-- INVITE -->
+<div id="sec-invite" class="section">
+  <div class="card">
+    <div class="card-title">&#128279; Invite to Group</div>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">Share this QR code or link with friends to join your group.</p>
+    <div class="qr-wrap"><div id="invite-qr" style="display:inline-block;"></div></div>
+    <div class="link-box" id="invite-link" onclick="copyLink()"></div>
+    <p style="font-size:11px;color:var(--muted);text-align:center;">Click link to copy</p>
+    <div style="display:flex;gap:8px;margin-top:12px;">
+      <button class="btn btn-primary" style="flex:1;" onclick="copyLink()">&#128203; Copy Link</button>
+      <button class="btn" style="background:#F0FDF4;color:#16A34A;flex:1;" onclick="shareWA()">&#128172; WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF EXPORT -->
+<div id="sec-pdf" class="section">
+  <div class="card">
+    <div class="card-title">&#128196; Export Full Season PDF</div>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:14px;">Generate a comprehensive PDF report containing the overall leaderboard and all match entries for the entire season.</p>
+    <div id="pdf-preview" style="margin-top:16px;"></div>
+    <button class="btn-pdf" onclick="generatePDF()" style="margin-top:14px;width:100%;">&#128196; Download Full Season PDF</button>
+  </div>
+</div>
+</div>
+
+<!-- SCHEDULE -->
+<div id="sec-schedule" class="section">
+  <div class="card">
+    <div class="card-title">&#128197; IPL 2026 Full Schedule (74 Matches)</div>
+    <div class="schedule-filter">
+      <select id="sch-team-filter" onchange="renderSchedule()">
+        <option value="">All Teams</option>
+        <option>Chennai Super Kings</option>
+        <option>Delhi Capitals</option>
+        <option>Gujarat Titans</option>
+        <option>Kolkata Knight Riders</option>
+        <option>Lucknow Super Giants</option>
+        <option>Mumbai Indians</option>
+        <option>Punjab Kings</option>
+        <option>Rajasthan Royals</option>
+        <option>Royal Challengers Bengaluru</option>
+        <option>Sunrisers Hyderabad</option>
+      </select>
+      <button class="btn btn-primary" onclick="useScheduleMatch()" id="sch-use-btn" style="display:none;">&#9999;&#65039; Use for Entry</button>
+    </div>
+    <div id="schedule-list"></div>
+  </div>
+</div>
+
+</div><!-- /content -->
+</div><!-- /page-app -->
+
+<!-- MODAL: QR SCANNER -->
+<div id="modal-scanner" class="modal-overlay hidden">
+  <div class="modal-box">
+    <button class="modal-close" onclick="closeScanner()">&times;</button>
+    <div class="modal-title">&#128247; Scan QR Code</div>
+    <div id="qr-reader"></div>
+    <div style="margin-top:12px;"><label>Or paste invite code:</label>
+      <div style="display:flex;gap:8px;margin-top:4px;"><input id="manual-code" placeholder="Paste code" style="flex:1;"/><button class="btn btn-primary" onclick="joinByCode()">Join</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════
+var state = {users:{},groups:{},currentUser:null,activeGroup:null};
+function load(){try{var s=localStorage.getItem('ipl2026_v2');if(s)state=JSON.parse(s);}catch(e){}}
+function save(){try{localStorage.setItem('ipl2026_v2',JSON.stringify(state));}catch(e){}}
+load();
+
+// ═══════════════════════════════════════
+// FIREBASE + GOOGLE AUTH
+// ═══════════════════════════════════════
+var firebaseConfig = {
+  apiKey: "AIzaSyAd0cmf4MNC1KF_G1_Q4eNeQLufxMY0H_o",
+  authDomain: "fantasypointtracker.live",
+  projectId: "ipl-fantasy-tracker-9baf1",
+  storageBucket: "ipl-fantasy-tracker-9baf1.firebasestorage.app",
+  messagingSenderId: "875339224255",
+  appId: "1:875339224255:web:d616bdf93abc648df7a20a"
+};
+firebase.initializeApp(firebaseConfig);
+var googleProvider = new firebase.auth.GoogleAuthProvider();
+
+function authAlert(msg,ok){var a=document.getElementById('auth-alert');a.textContent=msg;a.className='auth-alert '+(ok?'ok':'err');a.style.display='block';}
+
+function googleSignIn(){
+  firebase.auth().signInWithPopup(googleProvider).then(function(result){
+    var user = result.user;
+    var uid = user.uid;
+    // Save user info
+    if(!state.users[uid]){
+      state.users[uid] = {display: user.displayName||user.email, photo: user.photoURL||'', email: user.email||'', created: new Date().toISOString()};
+    } else {
+      state.users[uid].display = user.displayName||state.users[uid].display;
+      state.users[uid].photo = user.photoURL||'';
+    }
+    state.currentUser = uid;
+    save();
+    afterLogin();
+  }).catch(function(error){
+    authAlert(error.message || 'Google sign-in failed.',0);
+  });
+}
+
+function afterLogin(){
+  if(state.activeGroup&&state.groups[state.activeGroup]){showPage('page-app');initApp();}
+  else{showPage('page-groups');initGroupsPage();}
+}
+function doLogout(){
+  if(!confirm('Logout?'))return;
+  firebase.auth().signOut();
+  state.currentUser=null;state.activeGroup=null;save();showPage('page-home');
+}
+function getDisplay(){
+  var u=state.users[state.currentUser];
+  return u?u.display:state.currentUser;
+}
+function getUserPhoto(){
+  var u=state.users[state.currentUser];
+  return u&&u.photo?u.photo:'';
+}
+
+// ═══════════════════════════════════════
+// PAGES
+// ═══════════════════════════════════════
+function showPage(id){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});document.getElementById(id).classList.add('active');}
+
+// ═══════════════════════════════════════
+// GROUPS PAGE
+// ═══════════════════════════════════════
+function initGroupsPage(){
+  document.getElementById('grp-username').textContent=getDisplay();
+  renderGroupsList();
+}
+function createGroup(){
+  var name=document.getElementById('cg-name').value.trim();
+  if(!name){showGrpAlert('Enter a group name.','error');return;}
+  var id=Math.random().toString(36).substr(2,8).toUpperCase();
+  state.groups[id]={id:id,name:name,admin:state.currentUser,members:[state.currentUser],entries:[],created:new Date().toISOString()};
+  save();document.getElementById('cg-name').value='';
+  showGrpAlert('Group "'+name+'" created!','success');renderGroupsList();
+}
+function renderGroupsList(){
+  var el=document.getElementById('groups-list');
+  var keys=Object.keys(state.groups);
+  if(!keys.length){el.innerHTML='<p style="color:var(--muted);text-align:center;padding:16px;">No groups yet. Create one!</p>';return;}
+  el.innerHTML=keys.map(function(id){
+    var g=state.groups[id];
+    var isMember=g.members.indexOf(state.currentUser)>=0;
+    return '<div class="group-card">'
+      +'<div class="group-card-name">'+g.name+'</div>'
+      +'<div class="group-card-meta">Admin: <b>'+((state.users[g.admin]||{}).display||g.admin)+'</b> | Members: <b>'+g.members.length+'</b> | Code: <code style="background:#F1F5F9;padding:1px 6px;border-radius:4px;font-size:11px;">'+g.id+'</code></div>'
+      +'<div class="group-actions">'
+        +(isMember?'<button class="btn-grp btn-grp-main" onclick="enterGroup(\''+g.id+'\')">&#9654; Enter Group</button>':'<button class="btn-grp" onclick="joinGroup(\''+g.id+'\')">&#128101; Join</button>')
+      +'</div>'
+    +'</div>';
+  }).join('');
+}
+function joinGroup(gid){
+  var g=state.groups[gid];if(!g)return;
+  if(g.members.indexOf(state.currentUser)<0){g.members.push(state.currentUser);save();}
+  renderGroupsList();
+}
+function enterGroup(gid){
+  state.activeGroup=gid;save();showPage('page-app');initApp();
+}
+function leaveGroup(){state.activeGroup=null;save();showPage('page-groups');initGroupsPage();}
+function showGrpAlert(m,t){var e=document.getElementById('grp-alert');e.textContent=m;e.className='alert alert-'+t;e.style.display='block';setTimeout(function(){e.style.display='none';},3000);}
+
+// ═══════════════════════════════════════
+// APP
+// ═══════════════════════════════════════
+function initApp(){
+  var g=state.groups[state.activeGroup];if(!g)return;
+  document.getElementById('app-group-name').textContent=g.name+' ('+g.members.length+' members)';
+  var photo=getUserPhoto();
+  document.getElementById('app-username').innerHTML=(photo?'<img src="'+photo+'" style="width:22px;height:22px;border-radius:50%;"/>':'')+getDisplay();
+  showTab('dashboard',document.querySelector('.tab-btn'));
+  renderAll();
+}
+function showTab(id,btn){
+  document.querySelectorAll('.section').forEach(function(s){s.classList.remove('active');});
+  document.getElementById('sec-'+id).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
+  if(btn)btn.classList.add('active');
+  renderAll();
+}
+function showAlert(id,msg,type){var e=document.getElementById(id);e.textContent=msg;e.className='alert alert-'+type;e.style.display='block';setTimeout(function(){e.style.display='none';},3000);}
+
+// ═══════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════
+function getEntries(){var g=state.groups[state.activeGroup];return g?g.entries:[];}
+
+function renderAll(){renderMetrics();renderDashLB();renderRecent();populateMemberRows();renderEntries();renderLeaderboard();renderPDFSelect();renderInvite();renderSchedule();}
+
+function renderMetrics(){
+  var entries=getEntries();
+  var players=[],matches=[],totalPts=0;
+  entries.forEach(function(e){if(players.indexOf(e.user)<0)players.push(e.user);if(matches.indexOf(e.matchNum)<0)matches.push(e.matchNum);totalPts+=e.totalPts;});
+  document.getElementById('metrics-bar').innerHTML=
+    '<div class="metric"><div class="metric-val">'+players.length+'</div><div class="metric-label">Players</div></div>'
+    +'<div class="metric"><div class="metric-val">'+matches.length+'</div><div class="metric-label">Matches</div></div>'
+    +'<div class="metric"><div class="metric-val">'+totalPts.toFixed(1)+'</div><div class="metric-label">Total Points</div></div>'
+    +'<div class="metric"><div class="metric-val">'+entries.length+'</div><div class="metric-label">Entries</div></div>';
+}
+
+function getLBData(){
+  var entries=getEntries(),data={};
+  entries.forEach(function(e){
+    if(!data[e.user])data[e.user]={total:0,matches:{}};
+    data[e.user].total+=e.totalPts;data[e.user].matches[e.matchNum]=1;
+  });
+  return Object.keys(data).map(function(u){var d=data[u];return{name:(state.users[u]||{}).display||u,total:d.total,matches:Object.keys(d.matches).length,avg:Object.keys(d.matches).length?d.total/Object.keys(d.matches).length:0};}).sort(function(a,b){return b.total-a.total;});
+}
+
+var medals=['&#129351;','&#129352;','&#129353;'];
+var rankCls=['rank-1','rank-2','rank-3'];
+var numCls=['rank-gold','rank-silver','rank-bronze'];
+
+function renderDashLB(){
+  var lb=getLBData().slice(0,5);
+  document.getElementById('dash-lb').innerHTML=lb.length?lb.map(function(p,i){
+    return '<tr class="'+(rankCls[i]||'')+'"><td><span class="rank-num '+(numCls[i]||'')+'">'+(medals[i]||(i+1))+'</span></td><td><b>'+p.name+'</b></td><td>'+p.matches+'</td><td><b>'+p.total.toFixed(1)+'</b></td></tr>';
+  }).join(''):'<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:16px;">No entries yet</td></tr>';
+}
+function renderRecent(){
+  var entries=getEntries().slice(-8).reverse();
+  document.getElementById('dash-recent').innerHTML=entries.length?entries.map(function(e){
+    return '<tr><td style="font-size:12px;color:var(--muted);">M'+e.matchNum+': '+e.matchName+'</td><td>'+((state.users[e.user]||{}).display||e.user)+'</td><td><b>'+e.totalPts.toFixed(1)+'</b></td></tr>';
+  }).join(''):'<tr><td colspan="3" style="text-align:center;color:var(--muted);padding:16px;">No entries yet</td></tr>';
+}
+
+// MATCH ENTRY — Member-wise
+function populateMemberRows(){
+  var el=document.getElementById('member-entry-rows');if(!el)return;
+  var g=state.groups[state.activeGroup];if(!g){el.innerHTML='';return;}
+  // Only rebuild if member count changed
+  if(el.dataset.count==g.members.length)return;
+  el.dataset.count=g.members.length;
+  el.innerHTML=g.members.map(function(uid,i){
+    var display=(state.users[uid]||{}).display||uid;
+    return '<tr style="border-bottom:1px solid var(--border);">'
+      +'<td style="padding:10px 8px;"><b style="color:var(--blue);font-size:14px;">'+display+'</b></td>'
+      +'<td style="padding:10px 8px;"><input id="me-team-'+i+'" placeholder="e.g. Mumbai Indians" style="width:100%;"/></td>'
+      +'<td style="padding:10px 8px;"><input id="me-pts-'+i+'" type="number" step="0.5" min="0" placeholder="0" style="width:100%;"/></td>'
+      +'</tr>';
+  }).join('');
+}
+function clearMatchForm(){
+  document.getElementById('m-name').value='';document.getElementById('m-num').value='';
+  var g=state.groups[state.activeGroup];if(!g)return;
+  g.members.forEach(function(uid,i){
+    var t=document.getElementById('me-team-'+i);if(t)t.value='';
+    var p=document.getElementById('me-pts-'+i);if(p)p.value='';
+  });
+}
+function submitMatch(){
+  var mName=document.getElementById('m-name').value.trim();
+  var mNum=parseInt(document.getElementById('m-num').value)||0;
+  if(!mName||!mNum){showAlert('entry-alert','Enter match name and number.','error');return;}
+  var g=state.groups[state.activeGroup];if(!g)return;
+  var count=0;
+  g.members.forEach(function(uid,i){
+    var team=(document.getElementById('me-team-'+i)||{}).value;
+    var pts=parseFloat((document.getElementById('me-pts-'+i)||{}).value)||0;
+    if(team&&team.trim()&&pts>0){
+      g.entries.push({user:uid,matchName:mName,matchNum:mNum,teamName:team.trim(),totalPts:pts,date:new Date().toISOString()});
+      count++;
+    }
+  });
+  if(!count){showAlert('entry-alert','Enter team name & points for at least 1 member.','error');return;}
+  save();
+  showAlert('entry-alert','Match #'+mNum+' saved! '+count+' member entries added.','success');
+  clearMatchForm();renderAll();
+}
+function renderEntries(){
+  var entries=getEntries();
+  document.getElementById('entries-body').innerHTML=entries.length?entries.slice().reverse().map(function(e,ri){
+    var i=entries.length-1-ri;
+    var display=(state.users[e.user]||{}).display||e.user;
+    return '<tr><td><b>M'+(e.matchNum||'')+'</b>: '+(e.matchName||'')+'</td><td>'+display+'</td><td>'+(e.teamName||((e.team1||{}).name||''))+'</td><td><b>'+e.totalPts.toFixed(1)+'</b></td><td class="no-print"><button class="btn btn-danger" onclick="deleteEntry('+i+')">&#10005;</button></td></tr>';
+  }).join(''):'<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px;">No entries yet</td></tr>';
+}
+function deleteEntry(i){if(!confirm('Delete this entry?'))return;var g=state.groups[state.activeGroup];g.entries.splice(i,1);save();renderAll();}
+
+// ═══════════════════════════════════════
+// LEADERBOARD
+// ═══════════════════════════════════════
+function renderLeaderboard(){
+  var lb=getLBData();
+  document.getElementById('lb-group').innerHTML=lb.length?lb.map(function(p,i){
+    return '<tr class="'+(rankCls[i]||'')+'"><td><span class="rank-num '+(numCls[i]||'')+'">'+(medals[i]||(i+1))+'</span></td><td><b>'+p.name+'</b></td><td>'+p.matches+'</td><td><b style="font-size:16px;color:var(--blue);">'+p.total.toFixed(1)+'</b></td><td>'+p.avg.toFixed(1)+'</td></tr>';
+  }).join(''):'<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px;">No data yet</td></tr>';
+}
+
+// ═══════════════════════════════════════
+// INVITE
+// ═══════════════════════════════════════
+var inviteLink='';
+function renderInvite(){
+  var gid=state.activeGroup;if(!gid)return;
+  var base=window.location.href.split('?')[0].split('#')[0];
+  inviteLink=base+'?join='+gid;
+  document.getElementById('invite-link').textContent=inviteLink;
+  var qrEl=document.getElementById('invite-qr');qrEl.innerHTML='';
+  try{if(typeof QRCode!=='undefined'){new QRCode(qrEl,{text:inviteLink,width:220,height:220,colorDark:'#003366',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.H});}
+  else{qrEl.innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent(inviteLink)+'" width="220" height="220" style="border-radius:10px;"/>';}}
+  catch(e){qrEl.innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent(inviteLink)+'" width="220" height="220" style="border-radius:10px;"/>';}
+}
+function copyLink(){if(!inviteLink)return;navigator.clipboard.writeText(inviteLink).catch(function(){});alert('Link copied!');}
+function shareWA(){if(!inviteLink)return;var g=state.groups[state.activeGroup];var t='Join "'+g.name+'" on IPL 2026 Fantasy Tracker!\n'+inviteLink;window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');}
+
+// ═══════════════════════════════════════
+// PDF EXPORT
+// ═══════════════════════════════════════
+function renderPDFSelect(){
+  showPDFPreview();
+}
+function getMatchEntries(matchNum){
+  return getEntries().filter(function(e){return e.matchNum==matchNum;});
+}
+function showPDFPreview(){
+  var el=document.getElementById('pdf-preview');if(!el)return;
+  var g=state.groups[state.activeGroup];if(!g){el.innerHTML='';return;}
+  var entries=getEntries();
+  if(!entries.length){el.innerHTML='<div style="color:var(--muted);font-size:13px;">No entries available for export yet.</div>';return;}
+  
+  var memberPoints={};
+  entries.forEach(function(e){memberPoints[e.user]=(memberPoints[e.user]||0)+e.totalPts;});
+  var lb=Object.keys(memberPoints).map(function(k){return{user:k,pts:memberPoints[k]};});
+  lb.sort(function(a,b){return b.pts-a.pts;});
+  
+  var previewHtml='<div class="card" style="background:rgba(124,77,255,0.05);border-color:var(--purple);">'
+    +'<div style="font-weight:bold;color:var(--cyan);margin-bottom:8px;">Report Summary:</div>'
+    +'<div style="font-size:13px;color:var(--text);margin-bottom:4px;">Total Matches Recorded: <b style="color:var(--green);">'+new Set(entries.map(function(e){return e.matchNum;})).size+'</b></div>'
+    +'<div style="font-size:13px;color:var(--text);margin-bottom:4px;">Total Individual Entries: <b>'+entries.length+'</b></div>'
+    +'<div style="font-size:13px;color:var(--text);margin-bottom:12px;">Current Leader: <b style="color:var(--green);">'+((state.users[lb[0].user]||{}).display||lb[0].user)+'</b> ('+lb[0].pts.toFixed(1)+' pts)</div>'
+    +'<div style="font-size:12px;color:var(--muted);">Click Download below to get the full multi-page report including the Leaderboard and details for every match.</div>'
+    +'</div>';
+  el.innerHTML=previewHtml;
+}
+
+function generatePDF(){
+  var g=state.groups[state.activeGroup];if(!g)return;
+  var entries=getEntries();
+  if(!entries.length){alert('No entries to export yet.');return;}
+  
+  var jsPDF=window.jspdf.jsPDF;var doc=new jsPDF();
+  
+  // Theme Colors
+  var cBg=[26,10,62];
+  var cText=[232,224,255];
+  var cGreen=[0,230,118];
+  var cCyan=[0,229,255];
+  var cPurple=[124,77,255];
+  
+  // Header
+  doc.setFillColor.apply(doc,cBg);doc.rect(0,0,210,35,'F');
+  doc.setTextColor.apply(doc,cGreen);doc.setFontSize(22);doc.setFont('helvetica','bold');
+  doc.text('FANTASY POINT TRACKER - IPL 2026',105,16,{align:'center'});
+  doc.setFontSize(10);doc.setTextColor(200,200,200);
+  doc.text('Full Season Report | 74 Matches | 10 Teams',105,24,{align:'center'});
+  
+  // Group name
+  doc.setTextColor.apply(doc,cPurple);doc.setFontSize(18);doc.setFont('helvetica','bold');
+  doc.text(g.name,105,48,{align:'center'});
+  doc.setDrawColor.apply(doc,cCyan);doc.setLineWidth(0.8);doc.line(20,54,190,54);
+  
+  var finalY=64;
+  
+  // 1. OVERALL LEADERBOARD
+  doc.setFontSize(14);doc.setTextColor.apply(doc,cBg);doc.text('Overall Leaderboard',14,finalY);
+  finalY+=6;
+  
+  var memberStats={};
+  entries.forEach(function(e){
+    if(!memberStats[e.user]) memberStats[e.user]={user:e.user, pts:0, matches:0};
+    memberStats[e.user].pts+=e.totalPts;
+    memberStats[e.user].matches++;
+  });
+  var lb=Object.values(memberStats).sort(function(a,b){return b.pts-a.pts;});
+  var lbBody=lb.map(function(st,idx){return [idx+1,(state.users[st.user]||{}).display||st.user, st.matches, st.pts.toFixed(1)];});
+  
+  doc.autoTable({startY:finalY,head:[['Rank','Member','Matches Played','Total Points']],body:lbBody,
+    headStyles:{fillColor:cPurple,textColor:[255,255,255],fontStyle:'bold'},
+    alternateRowStyles:{fillColor:[245,247,250]},
+    styles:{fontSize:11,cellPadding:5},
+    columnStyles:{0:{halign:'center'},2:{halign:'center'},3:{halign:'center',fontStyle:'bold',textColor:cBg}}
+  });
+  finalY=doc.lastAutoTable.finalY+20;
+  
+  // 2. MATCH BY MATCH BREAKDOWN
+  // Group entries by match number
+  var matchMap={};
+  entries.forEach(function(e){
+    if(!matchMap[e.matchNum]) matchMap[e.matchNum]=[];
+    matchMap[e.matchNum].push(e);
+  });
+  
+  // Sort match numbers descending (latest first)
+  var matchNums=Object.keys(matchMap).map(Number).sort(function(a,b){return b-a;});
+  
+  matchNums.forEach(function(mNum){
+    var mEntries=matchMap[mNum];
+    // Check if we need a new page
+    if(finalY>240){doc.addPage();finalY=20;}
+    
+    doc.setFontSize(12);doc.setTextColor.apply(doc,cPurple);doc.setFont('helvetica','bold');
+    doc.text('Match #'+mNum+': '+mEntries[0].matchName,14,finalY);
+    finalY+=6;
+    
+    var mTotal=0;
+    var mBody=mEntries.map(function(e){
+      mTotal+=e.totalPts;
+      return [(state.users[e.user]||{}).display||e.user, e.teamName||'', e.totalPts.toFixed(1)];
+    });
+    mBody.push(['','MATCH TOTAL',mTotal.toFixed(1)]);
+    
+    doc.autoTable({startY:finalY,head:[['Member','Team','Points']],body:mBody,
+      headStyles:{fillColor:cBg,textColor:[255,255,255],fontStyle:'bold'},
+      alternateRowStyles:{fillColor:[245,247,250]},
+      styles:{fontSize:10,cellPadding:4},
+      columnStyles:{2:{halign:'center',fontStyle:'bold'}},
+      didParseCell:function(data){
+        if(data.row.index===mBody.length-1){
+          data.cell.styles.fillColor=cGreen;
+          data.cell.styles.textColor=[255,255,255];
+          data.cell.styles.fontStyle='bold';
+        }
+      }
+    });
+    finalY=doc.lastAutoTable.finalY+15;
+  });
+  
+  // Footer
+  doc.setFontSize(9);doc.setTextColor(150,150,150);
+  doc.text('Generated: '+new Date().toLocaleDateString('en-IN')+' | FantasyPointTracker.live',20,doc.internal.pageSize.height-10);
+  
+  doc.save('IPL2026_FullSeason_'+g.name.replace(/\s+/g,'_')+'.pdf');
+}
+
+// ═══════════════════════════════════════
+// IPL 2026 SCHEDULE DATA
+// ═══════════════════════════════════════
+var IPL_SCHEDULE=[
+{m:1,t1:"SRH",t2:"RCB",d:"28 Mar",v:"Bengaluru"},{m:2,t1:"KKR",t2:"MI",d:"29 Mar",v:"Mumbai"},{m:3,t1:"CSK",t2:"RR",d:"30 Mar",v:"Guwahati"},
+{m:4,t1:"GT",t2:"PBKS",d:"31 Mar",v:"New Chandigarh"},{m:5,t1:"LSG",t2:"DC",d:"1 Apr",v:"Lucknow"},{m:6,t1:"SRH",t2:"KKR",d:"2 Apr",v:"Kolkata"},
+{m:7,t1:"CSK",t2:"PBKS",d:"3 Apr",v:"Chennai"},{m:8,t1:"MI",t2:"DC",d:"4 Apr",v:"Delhi"},{m:9,t1:"RR",t2:"GT",d:"4 Apr",v:"Ahmedabad"},
+{m:10,t1:"SRH",t2:"LSG",d:"5 Apr",v:"Hyderabad"},{m:11,t1:"RCB",t2:"CSK",d:"5 Apr",v:"Bengaluru"},{m:12,t1:"KKR",t2:"PBKS",d:"6 Apr",v:"Kolkata"},
+{m:13,t1:"RR",t2:"MI",d:"7 Apr",v:"Guwahati"},{m:14,t1:"GT",t2:"DC",d:"8 Apr",v:"Delhi"},{m:15,t1:"KKR",t2:"LSG",d:"9 Apr",v:"Kolkata"},
+{m:16,t1:"RCB",t2:"RR",d:"10 Apr",v:"Guwahati"},{m:17,t1:"SRH",t2:"PBKS",d:"11 Apr",v:"New Chandigarh"},{m:18,t1:"CSK",t2:"DC",d:"11 Apr",v:"Chennai"},
+{m:19,t1:"LSG",t2:"GT",d:"12 Apr",v:"Lucknow"},{m:20,t1:"RCB",t2:"MI",d:"12 Apr",v:"Mumbai"},{m:21,t1:"SRH",t2:"RR",d:"13 Apr",v:"Hyderabad"},
+{m:22,t1:"CSK",t2:"KKR",d:"14 Apr",v:"Chennai"},{m:23,t1:"LSG",t2:"RCB",d:"15 Apr",v:"Bengaluru"},{m:24,t1:"MI",t2:"PBKS",d:"16 Apr",v:"Mumbai"},
+{m:25,t1:"KKR",t2:"GT",d:"17 Apr",v:"Ahmedabad"},{m:26,t1:"RCB",t2:"DC",d:"18 Apr",v:"Bengaluru"},{m:27,t1:"SRH",t2:"CSK",d:"18 Apr",v:"Hyderabad"},
+{m:28,t1:"RR",t2:"KKR",d:"19 Apr",v:"Kolkata"},{m:29,t1:"PBKS",t2:"LSG",d:"19 Apr",v:"New Chandigarh"},{m:30,t1:"MI",t2:"GT",d:"20 Apr",v:"Ahmedabad"},
+{m:31,t1:"SRH",t2:"DC",d:"21 Apr",v:"Hyderabad"},{m:32,t1:"RR",t2:"LSG",d:"22 Apr",v:"Lucknow"},{m:33,t1:"CSK",t2:"MI",d:"23 Apr",v:"Mumbai"},
+{m:34,t1:"GT",t2:"RCB",d:"24 Apr",v:"Bengaluru"},{m:35,t1:"DC",t2:"PBKS",d:"25 Apr",v:"Delhi"},{m:36,t1:"RR",t2:"SRH",d:"25 Apr",v:"Jaipur"},
+{m:37,t1:"CSK",t2:"GT",d:"26 Apr",v:"Chennai"},{m:38,t1:"KKR",t2:"LSG",d:"26 Apr",v:"Lucknow"},{m:39,t1:"DC",t2:"RCB",d:"27 Apr",v:"Delhi"},
+{m:40,t1:"PBKS",t2:"RR",d:"28 Apr",v:"New Chandigarh"},{m:41,t1:"MI",t2:"SRH",d:"29 Apr",v:"Mumbai"},{m:42,t1:"GT",t2:"RCB",d:"30 Apr",v:"Ahmedabad"},
+{m:43,t1:"RR",t2:"DC",d:"1 May",v:"Jaipur"},{m:44,t1:"CSK",t2:"MI",d:"2 May",v:"Chennai"},{m:45,t1:"SRH",t2:"KKR",d:"3 May",v:"Hyderabad"},
+{m:46,t1:"GT",t2:"PBKS",d:"3 May",v:"Ahmedabad"},{m:47,t1:"MI",t2:"LSG",d:"4 May",v:"Mumbai"},{m:48,t1:"DC",t2:"CSK",d:"5 May",v:"Delhi"},
+{m:49,t1:"SRH",t2:"PBKS",d:"6 May",v:"Hyderabad"},{m:50,t1:"LSG",t2:"RCB",d:"7 May",v:"Lucknow"},{m:51,t1:"DC",t2:"KKR",d:"8 May",v:"Delhi"},
+{m:52,t1:"RR",t2:"GT",d:"9 May",v:"Jaipur"},{m:53,t1:"CSK",t2:"LSG",d:"10 May",v:"Chennai"},{m:54,t1:"RCB",t2:"MI",d:"10 May",v:"Raipur"},
+{m:55,t1:"PBKS",t2:"DC",d:"11 May",v:"Dharamsala"},{m:56,t1:"GT",t2:"SRH",d:"12 May",v:"Ahmedabad"},{m:57,t1:"RCB",t2:"KKR",d:"13 May",v:"Raipur"},
+{m:58,t1:"PBKS",t2:"MI",d:"14 May",v:"Dharamsala"},{m:59,t1:"LSG",t2:"CSK",d:"15 May",v:"Lucknow"},{m:60,t1:"KKR",t2:"GT",d:"16 May",v:"Kolkata"},
+{m:61,t1:"PBKS",t2:"RCB",d:"17 May",v:"Dharamsala"},{m:62,t1:"DC",t2:"RR",d:"17 May",v:"Delhi"},{m:63,t1:"CSK",t2:"SRH",d:"18 May",v:"Chennai"},
+{m:64,t1:"RR",t2:"LSG",d:"19 May",v:"Jaipur"},{m:65,t1:"KKR",t2:"MI",d:"20 May",v:"Kolkata"},{m:66,t1:"GT",t2:"CSK",d:"21 May",v:"Ahmedabad"},
+{m:67,t1:"SRH",t2:"RCB",d:"22 May",v:"Hyderabad"},{m:68,t1:"LSG",t2:"PBKS",d:"23 May",v:"Lucknow"},{m:69,t1:"MI",t2:"RR",d:"24 May",v:"Mumbai"},
+{m:70,t1:"KKR",t2:"DC",d:"24 May",v:"Kolkata"},
+{m:71,t1:"TBD",t2:"TBD",d:"27 May",v:"TBD"},{m:72,t1:"TBD",t2:"TBD",d:"28 May",v:"TBD"},
+{m:73,t1:"TBD",t2:"TBD",d:"29 May",v:"TBD"},{m:74,t1:"TBD",t2:"TBD",d:"31 May",v:"Bengaluru"}
+];
+var TEAM_FULL={KKR:"Kolkata Knight Riders",RCB:"Royal Challengers Bengaluru",SRH:"Sunrisers Hyderabad",RR:"Rajasthan Royals",CSK:"Chennai Super Kings",MI:"Mumbai Indians",DC:"Delhi Capitals",LSG:"Lucknow Super Giants",GT:"Gujarat Titans",PBKS:"Punjab Kings",TBD:"TBD"};
+var selectedSchMatch=null;
+
+function renderSchedule(){
+  var el=document.getElementById('schedule-list');if(!el)return;
+  var filter=document.getElementById('sch-team-filter').value;
+  var today=new Date().toDateString();
+  var matches=IPL_SCHEDULE;
+  if(filter){matches=matches.filter(function(m){return TEAM_FULL[m.t1]===filter||TEAM_FULL[m.t2]===filter;});}
+  el.innerHTML=matches.map(function(m){
+    var dateStr=m.d+' 2026';
+    var isToday=false;try{isToday=new Date(dateStr).toDateString()===today;}catch(e){}
+    var isPast=false;try{isPast=new Date(dateStr)<new Date()&&!isToday;}catch(e){}
+    var cls='schedule-card'+(isToday?' today':'')+(isPast?' past':'');
+    return '<div class="'+cls+'" onclick="selectSchMatch('+m.m+')" id="sch-m'+m.m+'">'
+      +'<div class="match-num">M'+m.m+'</div>'
+      +'<div class="teams">'+(TEAM_FULL[m.t1]||m.t1)+' <span style="color:var(--orange);font-weight:400;">vs</span> '+(TEAM_FULL[m.t2]||m.t2)+'</div>'
+      +'<div><div class="match-date">&#128197; '+m.d+'</div><div class="match-venue">&#127967; '+m.v+'</div></div>'
+      +'</div>';
+  }).join('');
+}
+function selectSchMatch(num){
+  selectedSchMatch=IPL_SCHEDULE.find(function(m){return m.m===num;});
+  document.querySelectorAll('.schedule-card').forEach(function(c){c.style.outline='none';});
+  var el=document.getElementById('sch-m'+num);
+  if(el)el.style.outline='3px solid var(--orange)';
+  document.getElementById('sch-use-btn').style.display='inline-block';
+}
+function useScheduleMatch(){
+  if(!selectedSchMatch)return;
+  var m=selectedSchMatch;
+  document.getElementById('m-name').value=(TEAM_FULL[m.t1]||m.t1)+' vs '+(TEAM_FULL[m.t2]||m.t2);
+  document.getElementById('m-num').value=m.m;
+  showTab('entry',document.querySelectorAll('.tab-btn')[1]);
+}
+
+// ═══════════════════════════════════════
+// QR SCANNER
+// ═══════════════════════════════════════
+var qrScanner=null;
+function openScanner(){document.getElementById('modal-scanner').classList.remove('hidden');}
+function closeScanner(){document.getElementById('modal-scanner').classList.add('hidden');if(qrScanner){qrScanner.stop().catch(function(){});qrScanner=null;}}
+function joinByCode(){var v=document.getElementById('manual-code').value.trim();if(!v)return;closeScanner();var gid=v.indexOf('join=')>=0?v.split('join=')[1].split('&')[0].toUpperCase():v.toUpperCase();if(state.groups[gid]){joinGroup(gid);renderGroupsList();alert('Joined!');}else{alert('Group not found: '+gid);}}
+
+// ═══════════════════════════════════════
+// URL JOIN
+// ═══════════════════════════════════════
+function checkURLJoin(){
+  try{var p=new URLSearchParams(window.location.search);var jid=p.get('join');
+  if(jid&&state.groups[jid.toUpperCase()]){
+    if(!state.currentUser){alert('Please login first, then use the invite link again.');return;}
+    joinGroup(jid.toUpperCase());state.activeGroup=jid.toUpperCase();save();showPage('page-app');initApp();
+  }}catch(e){}
+}
+
+// ═══════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════
+// Check Firebase auth state
+firebase.auth().onAuthStateChanged(function(user){
+  if(user && state.users[user.uid]){
+    state.currentUser = user.uid;
+    save();
+    afterLogin();
+  } else if(state.currentUser && state.users[state.currentUser]){
+    afterLogin();
+  } else {
+    showPage('page-home');
+  }
+});
+checkURLJoin();
+</script>
+</body>
+</html>

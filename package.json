@@ -1,0 +1,25 @@
+{
+  "name": "ipl-fantasy-tracker",
+  "version": "1.0.0",
+  "description": "IPL 2026 Fantasy Points Tracker - Track fantasy cricket points with friends",
+  "main": "IPL2026_Fantasy_Tracker.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Build complete - Static files ready'",
+    "start": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "ipl",
+    "fantasy-cricket",
+    "points-tracker",
+    "cricket",
+    "fantasy-league",
+    "ipl2026"
+  ],
+  "author": "FantasyPointTracker.live",
+  "license": "MIT",
+  "devDependencies": {
+    "vercel": "^28.0.0"
+  }
+}
