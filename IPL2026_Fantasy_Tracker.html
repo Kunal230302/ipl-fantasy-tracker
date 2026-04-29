@@ -204,8 +204,6 @@ tr:hover td{background:rgba(255,103,31,0.03);}
   </div>
 </div>
 </div>
-</div>
-
 <!-- ══════ PAGE: GROUPS ══════ -->
 <div id="page-groups" class="page">
 <div class="header">
@@ -252,6 +250,7 @@ tr:hover td{background:rgba(255,103,31,0.03);}
 </div>
 <div class="tabs-bar no-print">
   <button class="tab-btn active" onclick="showTab('dashboard',this)">&#128202; Dashboard</button>
+  <button class="tab-btn" onclick="showTab('members',this)">&#128101; Members</button>
   <button class="tab-btn" onclick="showTab('entry',this)">&#9999;&#65039; Match Entry</button>
   <button class="tab-btn" onclick="showTab('leaderboard',this)">&#127941; Leaderboard</button>
   <button class="tab-btn" onclick="showTab('invite',this)">&#128279; Invite</button>
@@ -268,6 +267,25 @@ tr:hover td{background:rgba(255,103,31,0.03);}
   </div>
   <div class="card"><div class="card-title">&#128203; Recent Entries</div>
     <table><thead><tr><th>Match</th><th>Player</th><th>Points</th></tr></thead><tbody id="dash-recent"></tbody></table>
+  </div>
+</div>
+
+<!-- MEMBERS MANAGE -->
+<div id="sec-members" class="section">
+  <div class="card">
+    <div class="card-title">&#128101; Manage Group Members</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">Add offline players manually. If you provide their email, their data will automatically sync to their account when they login with that email!</div>
+    <div class="form-grid">
+      <div><label>Player Name</label><input id="add-member-name" placeholder="e.g. Rahul Team 2"/></div>
+      <div><label>Email (Optional)</label><input id="add-member-email" placeholder="e.g. rahul@example.com"/></div>
+    </div>
+    <button class="btn btn-primary" onclick="addManualMember()">+ Add Player</button>
+    <div style="margin-top:16px;overflow-x:auto;">
+      <table style="width:100%;text-align:left;min-width:400px;">
+        <thead><tr><th>Name</th><th>Email / ID</th><th style="text-align:right;">Action</th></tr></thead>
+        <tbody id="members-manage-list"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
@@ -783,11 +801,193 @@ function getUserPhoto(){
 function showPage(id){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});document.getElementById(id).classList.add('active');}
 
 // ═══════════════════════════════════════
+// PLAYER MANAGEMENT SYSTEM
+// ═══════════════════════════════════════
+function addPlayerToGroup() {
+  var playerName = document.getElementById('add-player-name').value.trim();
+  var playerEmail = document.getElementById('add-player-email').value.trim();
+  
+  if (!playerName) {
+    showGrpAlert('Enter player name.', 'error');
+    return;
+  }
+  
+  if (!playerEmail || !playerEmail.includes('@')) {
+    showGrpAlert('Enter valid email address.', 'error');
+    return;
+  }
+  
+  var g = state.groups[state.activeGroup];
+  if (!g) return;
+  
+  // Create pending player with email verification
+  var playerId = 'pending_' + Math.random().toString(36).substr(2, 8).toUpperCase();
+  var verificationCode = Math.random().toString(36).substr(2, 6).toUpperCase();
+  
+  state.users[playerId] = {
+    display: playerName,
+    email: playerEmail,
+    verified: false,
+    verificationCode: verificationCode,
+    created: new Date().toISOString(),
+    teams: [] // Store multiple team names
+  };
+  
+  g.members.push(playerId);
+  save();
+  
+  document.getElementById('add-player-name').value = '';
+  document.getElementById('add-player-email').value = '';
+  
+  showGrpAlert('Player "' + playerName + '" added! Verification code: ' + verificationCode, 'success');
+  renderGroupsList();
+}
+
+function verifyPlayerEmail(code) {
+  var g = state.groups[state.activeGroup];
+  if (!g) return;
+  
+  g.members.forEach(function(uid) {
+    if (state.users[uid] && state.users[uid].verificationCode === code) {
+      state.users[uid].verified = true;
+      state.users[uid].verificationCode = null;
+      save();
+      showGrpAlert('Email verified successfully!', 'success');
+      renderGroupsList();
+    }
+  });
+}
+
+function editPlayerProfile(uid) {
+  var user = state.users[uid];
+  if (!user) return;
+  
+  var newName = prompt('Enter new display name:', user.display);
+  if (newName && newName.trim()) {
+    user.display = newName.trim();
+    save();
+    showGrpAlert('Profile updated!', 'success');
+    renderGroupsList();
+  }
+}
+
+function addPlayerTeamName(uid) {
+  var user = state.users[uid];
+  if (!user) return;
+  
+  if (!user.teams) user.teams = [];
+  
+  var teamName = prompt('Enter team name for ' + user.display + ':');
+  if (teamName && teamName.trim()) {
+    user.teams.push(teamName.trim());
+    save();
+    showGrpAlert('Team "' + teamName + '" added for ' + user.display, 'success');
+    renderGroupsList();
+  }
+}
+
+function getPlayerTeamOptions(uid) {
+  var user = state.users[uid];
+  if (!user || !user.teams || user.teams.length === 0) {
+    return user.display;
+  }
+  
+  return user.teams.map(function(team, i) {
+    return user.display + ' (' + team + ')';
+  }).join(', ');
+}
+
+function addManualMember() {
+  var name = document.getElementById('add-member-name').value.trim();
+  var email = document.getElementById('add-member-email').value.trim();
+  
+  if (!name) {
+    showAlert('entry-alert', 'Enter player name', 'error');
+    return;
+  }
+  
+  var g = state.groups[state.activeGroup];
+  if (!g) return;
+  
+  var memberId = 'manual_' + Math.random().toString(36).substr(2, 8).toUpperCase();
+  
+  state.users[memberId] = {
+    display: name,
+    email: email || null,
+    verified: false,
+    created: new Date().toISOString(),
+    teams: []
+  };
+  
+  g.members.push(memberId);
+  save();
+  saveGroupToCloud(state.activeGroup);
+  
+  document.getElementById('add-member-name').value = '';
+  document.getElementById('add-member-email').value = '';
+  
+  showAlert('entry-alert', 'Player "' + name + '" added!', 'success');
+  renderManageMembers();
+  renderAll();
+}
+
+function renderManageMembers() {
+  var g = state.groups[state.activeGroup];
+  if (!g) return;
+  
+  var el = document.getElementById('members-manage-list');
+  if (!el) return;
+  
+  el.innerHTML = g.members.map(function(uid) {
+    var user = state.users[uid] || {};
+    var isCurrentUser = uid === state.currentUser;
+    var isAdmin = g.admin === state.currentUser;
+    
+    return '<tr>' +
+      '<td><b>' + (user.display || uid) + '</b>' + 
+      (user.teams && user.teams.length > 0 ? '<br><small style="color:var(--muted);">' + user.teams.join(', ') + '</small>' : '') +
+      '</td>' +
+      '<td>' + (user.email || uid) + (user.verified ? ' ✓' : '') + '</td>' +
+      '<td style="text-align:right;">' +
+        (isAdmin && !isCurrentUser ? 
+          '<button class="btn btn-sm" style="background:var(--saffron);color:#fff;" onclick="editPlayerProfile(\'' + uid + '\')">Edit</button> ' +
+          '<button class="btn btn-sm" style="background:var(--border);" onclick="addPlayerTeamName(\'' + uid + '\')">+Team</button> ' +
+          '<button class="btn btn-sm btn-danger" onclick="removeMember(\'' + uid + '\')">Remove</button>' : 
+          '<span style="color:var(--muted);font-size:11px;">' + (isCurrentUser ? 'You' : 'Admin only') + '</span>') +
+      '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function removeMember(uid) {
+  if (!confirm('Remove this member from the group?')) return;
+  
+  var g = state.groups[state.activeGroup];
+  if (!g) return;
+  
+  g.members = g.members.filter(function(m) { return m !== uid; });
+  save();
+  saveGroupToCloud(state.activeGroup);
+  
+  showAlert('entry-alert', 'Member removed', 'success');
+  renderManageMembers();
+  renderAll();
+}
+
+// ═══════════════════════════════════════
 // GROUPS PAGE
 // ═══════════════════════════════════════
 function initGroupsPage(){
   document.getElementById('grp-username').textContent=getDisplay();
   renderGroupsList();
+}
+function createGroup(){
+  var name=document.getElementById('cg-name').value.trim();
+  if(!name){showGrpAlert('Enter a group name.','error');return;}
+  var id=Math.random().toString(36).substr(2,8).toUpperCase();
+  state.groups[id]={id:id,name:name,admin:state.currentUser,members:[state.currentUser],entries:[],created:new Date().toISOString()};
+  save();document.getElementById('cg-name').value='';
+  showGrpAlert('Group "'+name+'" created!','success');renderGroupsList();
 }
 function checkGroupName(){
   var name=document.getElementById('cg-name').value.trim().toLowerCase();
@@ -899,7 +1099,7 @@ function showAlert(id,msg,type){var e=document.getElementById(id);e.textContent=
 // ═══════════════════════════════════════
 function getEntries(){var g=state.groups[state.activeGroup];return (g&&g.entries)?g.entries:[];}
 
-function renderAll(){renderMetrics();renderDashLB();renderRecent();populateMemberRows();renderEntries();renderLeaderboard();renderPDFSelect();renderInvite();renderSchedule();populateMatchSelect();}
+function renderAll(){renderMetrics();renderDashLB();renderRecent();populateMemberRows();renderEntries();renderLeaderboard();renderPDFSelect();renderInvite();renderSchedule();populateMatchSelect();renderManageMembers();}
 
 function renderMetrics(){
   var entries=getEntries();
@@ -918,7 +1118,7 @@ function getLBData(){
     if(!data[e.user])data[e.user]={total:0,matches:{}};
     data[e.user].total+=e.totalPts;data[e.user].matches[e.matchNum]=1;
   });
-  return Object.keys(data).map(function(u){var d=data[u];return{user:u, name:(state.users[u]||{}).display||u,total:d.total,matches:Object.keys(d.matches).length,avg:Object.keys(d.matches).length?d.total/Object.keys(d.matches).length:0};}).sort(function(a,b){return b.total-a.total;});
+  return Object.keys(data).map(function(u){var d=data[u];return{user:u, name:getMemberName(u),total:d.total,matches:Object.keys(d.matches).length,avg:Object.keys(d.matches).length?d.total/Object.keys(d.matches).length:0};}).sort(function(a,b){return b.total-a.total;});
 }
 
 var medals=['<span class="crown">&#128081;</span>','&#129352;','&#129353;'];
@@ -952,7 +1152,7 @@ function populateMemberRows(){
     [1,2,3,4,5,6,7,8,9,10].map(function(n){return '<option>Team '+(n<10?'0':'')+n+'</option>'}).join('');
 
   el.innerHTML=g.members.map(function(uid,i){
-    var display=(state.users[uid]||{}).display||uid;
+    var display=getMemberName(uid);
     return '<tr style="border-bottom:1px solid var(--border);">'
       +'<td style="padding:10px 8px;"><b style="color:var(--blue);font-size:14px;">'+display+'</b></td>'
       +'<td style="padding:10px 8px;"><select id="me-team-'+i+'" style="width:100%;">'+teamOpts+'</select></td>'
@@ -994,23 +1194,23 @@ function submitMatch(){
   var count=0;
   g.members.forEach(function(uid,i){
     var team=(document.getElementById('me-team-'+i)||{}).value;
-    var pts=parseFloat((document.getElementById('me-pts-'+i)||{}).value)||0;
-    if(team&&team.trim()&&pts>0){
+    var pts=parseFloat((document.getElementById('me-pts-'+i)||{}).value);
+    if(isNaN(pts)) pts = 0;
+    if(team&&team.trim()&&pts>=0){
       g.entries.push({user:uid,matchName:mName,matchNum:mNum,teamName:team.trim(),totalPts:pts,date:new Date().toISOString()});
       count++;
     }
   });
   if(!count){showAlert('entry-alert','Enter team name & points for at least 1 member.','error');return;}
   save();
-  saveGroupToCloud(state.activeGroup); // ← Firestore sync on every match entry
-  showAlert('entry-alert','Match #'+mNum+' saved! '+count+' entries synced to cloud ☁️','success');
+  showAlert('entry-alert','Match #'+mNum+' saved! '+count+' member entries added.','success');
   clearMatchForm();renderAll();
 }
 function renderEntries(){
   var entries=getEntries();
   document.getElementById('entries-body').innerHTML=entries.length?entries.slice().reverse().map(function(e,ri){
     var i=entries.length-1-ri;
-    var display=(state.users[e.user]||{}).display||e.user;
+    var display=getMemberName(e.user);
     return '<tr><td><b>M'+(e.matchNum||'')+'</b>: '+(e.matchName||'')+'</td><td>'+display+'</td><td>'+(e.teamName||((e.team1||{}).name||''))+'</td><td><b>'+e.totalPts.toFixed(1)+'</b></td><td class="no-print"><button class="btn btn-danger" onclick="deleteEntry('+i+')">&#10005;</button></td></tr>';
   }).join(''):'<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px;">No entries yet</td></tr>';
 }
@@ -1351,6 +1551,33 @@ firebase.auth().onAuthStateChanged(async function(user){
     save();
     // Sync all groups from Firestore on login
     await loadAllGroupsFromCloud();
+    
+    // Auto-claim custom members by email
+    var email = user.email ? user.email.toLowerCase() : null;
+    if(email){
+      var changed = false;
+      Object.values(state.groups).forEach(function(g){
+        if(g.memberNames){
+          Object.keys(g.memberNames).forEach(function(uid){
+            if(uid.startsWith('custom_') && g.memberNames[uid].email && g.memberNames[uid].email.toLowerCase()===email){
+              var oldIdx = g.members.indexOf(uid);
+              if(oldIdx>=0){
+                g.members[oldIdx] = user.uid;
+                if(!g.memberNames[user.uid]) g.memberNames[user.uid] = g.memberNames[uid];
+                delete g.memberNames[uid];
+                if(g.entries){
+                  g.entries.forEach(function(e){if(e.user===uid) e.user=user.uid;});
+                }
+                changed = true;
+                saveGroupToCloud(g.id);
+              }
+            }
+          });
+        }
+      });
+      if(changed) save();
+    }
+    
     // Handle any pending join from URL
     var pendingJoin=sessionStorage.getItem('pending_join');
     if(pendingJoin){
