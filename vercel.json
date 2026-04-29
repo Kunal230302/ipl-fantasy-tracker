@@ -1,12 +1,6 @@
 {
   "version": 2,
   "name": "ipl-fantasy-tracker",
-  "builds": [
-    {
-      "src": "IPL2026_Fantasy_Tracker.html",
-      "use": "@vercel/static"
-    }
-  ],
   "routes": [
     {
       "src": "/",
@@ -15,34 +9,6 @@
     {
       "src": "/(.*)",
       "dest": "/IPL2026_Fantasy_Tracker.html"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        }
-      ]
-    },
-    {
-      "source": "/(.*\\.(css|js|png|jpg|jpeg|gif|ico|svg))",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
     }
   ]
 }
