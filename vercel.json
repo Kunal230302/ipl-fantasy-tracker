@@ -1,4 +1,16 @@
 {
   "version": 2,
-  "name": "ipl-fantasy-tracker"
+  "name": "ipl-fantasy-tracker",
+  "builds": [
+    {
+      "src": "IPL2026_Fantasy_Tracker.html",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/IPL2026_Fantasy_Tracker.html"
+    }
+  ]
 }

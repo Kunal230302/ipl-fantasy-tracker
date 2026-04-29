@@ -4,9 +4,8 @@
   "description": "IPL 2026 Fantasy Points Tracker - Track fantasy cricket points with friends",
   "main": "IPL2026_Fantasy_Tracker.html",
   "scripts": {
-    "dev": "vercel dev",
-    "start": "vercel dev",
-    "deploy": "vercel --prod"
+    "start": "node server.js",
+    "dev": "node server.js"
   },
   "keywords": [
     "ipl",
@@ -18,7 +17,5 @@
   ],
   "author": "FantasyPointTracker.live",
   "license": "MIT",
-  "devDependencies": {
-    "vercel": "^28.0.0"
-  }
+  "dependencies": {}
 }
