@@ -341,11 +341,168 @@ tr:hover td{background:rgba(124,77,255,.08);}
 <script>
 // ═══════════════════════════════════════
 // STATE
-// ═══════════════════════════════════════
+// ═══════════════════════════════════════// HYBRID STORAGE SYSTEM - IndexedDB + localStorage + Firebase
+// STORAGE
+var dbName = 'IPLFantasyTracker';
+var dbVersion = 1;
+var db;
+var storageMode = 'hybrid'; // 'localStorage', 'indexedDB', 'hybrid'
+
+// Initialize IndexedDB
+function initIndexedDB() {
+  return new Promise((resolve, reject) => {
+    var request = indexedDB.open(dbName, dbVersion);
+    
+    request.onerror = function() {
+      console.warn('IndexedDB not available, using localStorage');
+      storageMode = 'localStorage';
+      resolve(false);
+    };
+    
+    request.onsuccess = function() {
+      db = request.result;
+      console.log('IndexedDB initialized - Maximum storage available');
+      resolve(true);
+    };
+    
+    request.onupgradeneeded = function(event) {
+      db = event.target.result;
+      
+      // Create object stores
+      if (!db.objectStoreNames.contains('groups')) {
+        db.createObjectStore('groups', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('users')) {
+        db.createObjectStore('users', { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains('state')) {
+        db.createObjectStore('state', { keyPath: 'key' });
+      }
+    };
+  });
+}
+
+// Save to IndexedDB
+function saveToIndexedDB(key, data) {
+  if (!db || storageMode === 'localStorage') return Promise.resolve();
+  
+  return new Promise((resolve, reject) => {
+    var transaction = db.transaction(['state'], 'readwrite');
+    var store = transaction.objectStore('state');
+    var request = store.put({key: key, data: data, timestamp: Date.now()});
+    
+    request.onsuccess = function() {
+      resolve(request.result);
+    };
+    
+    request.onerror = function() {
+      reject(request.error);
+    };
+  });
+}
+
+// Load from IndexedDB
+function loadFromIndexedDB(key) {
+  if (!db || storageMode === 'localStorage') return Promise.resolve(null);
+  
+  return new Promise((resolve, reject) => {
+    var transaction = db.transaction(['state'], 'readonly');
+    var store = transaction.objectStore('state');
+    var request = store.get(key);
+    
+    request.onsuccess = function() {
+      resolve(request.result ? request.result.data : null);
+    };
+    
+    request.onerror = function() {
+      reject(request.error);
+    };
+  });
+}
+
+// Enhanced save function with multiple storage layers
+async function save() {
+  var stateData = JSON.stringify(state);
+  
+  try {
+    // Layer 1: localStorage (fast, small)
+    localStorage.setItem('ipl2026_v2', stateData);
+    
+    // Layer 2: IndexedDB (large, reliable)
+    if (storageMode === 'hybrid' || storageMode === 'indexedDB') {
+      await saveToIndexedDB('main_state', state);
+    }
+    
+    // Layer 3: Firebase (cloud sync - if online)
+    if (navigator.onLine && state.currentUser) {
+      // Firebase sync will be implemented separately
+    }
+    
+  } catch (error) {
+    console.warn('Save failed:', error);
+    // Fallback to localStorage only
+    try {
+      localStorage.setItem('ipl2026_v2', stateData);
+    } catch (e) {
+      console.error('All storage failed!');
+    }
+  }
+}
+
+// Enhanced load function with multiple storage layers
+async function load() {
+  try {
+    // Try localStorage first (fastest)
+    var localData = localStorage.getItem('ipl2026_v2');
+    if (localData) {
+      state = JSON.parse(localData);
+    }
+    
+    // Try IndexedDB for more recent data
+    if (storageMode === 'hybrid' || storageMode === 'indexedDB') {
+      var indexedData = await loadFromIndexedDB('main_state');
+      if (indexedData && indexedData.timestamp > (localStorage.getItem('ipl2026_timestamp') || 0)) {
+        state = indexedData;
+        localStorage.setItem('ipl2026_timestamp', indexedData.timestamp);
+      }
+    }
+    
+  } catch (error) {
+    console.warn('Load failed:', error);
+    // Initialize with empty state
+    state = {users:{},groups:{},currentUser:null,activeGroup:null};
+  }
+}
+
+// Check storage space
+function checkStorageSpace() {
+  if ('storage' in navigator && 'estimate' in navigator.storage) {
+    navigator.storage.estimate().then(function(estimate) {
+      console.log('=== STORAGE INFO ===');
+      console.log('Total Space:', (estimate.quota / 1024 / 1024).toFixed(2) + ' MB');
+      console.log('Used Space:', (estimate.usage / 1024 / 1024).toFixed(2) + ' MB');
+      console.log('Free Space:', ((estimate.quota - estimate.usage) / 1024 / 1024).toFixed(2) + ' MB');
+      console.log('Storage Mode:', storageMode);
+      console.log('==================');
+    });
+  }
+}
+
+// Initialize storage system
+initIndexedDB().then(function(indexedDBAvailable) {
+  if (indexedDBAvailable) {
+    console.log('IndexedDB available - Maximum storage mode');
+  } else {
+    console.log('Using localStorage fallback mode');
+  }
+  load().then(function() {
+    console.log('Storage system ready');
+    checkStorageSpace();
+  });
+});
+
+// STATE
 var state = {users:{},groups:{},currentUser:null,activeGroup:null};
-function load(){try{var s=localStorage.getItem('ipl2026_v2');if(s)state=JSON.parse(s);}catch(e){}}
-function save(){try{localStorage.setItem('ipl2026_v2',JSON.stringify(state));}catch(e){}}
-load();
 
 // ═══════════════════════════════════════
 // FIREBASE + GOOGLE AUTH
