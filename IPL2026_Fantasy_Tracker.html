@@ -12,6 +12,7 @@
 <!-- Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--blue:#1a0a3e;--gold:#00e676;--orange:#7c4dff;--light:#0d0b1a;--border:#2a1f5e;--text:#e8e0ff;--muted:#9e8cc7;--green:#00e676;--red:#ff5252;--cyan:#00e5ff;--purple:#7c4dff;}
@@ -201,6 +202,15 @@ tr:hover td{background:rgba(124,77,255,.08);}
       <div><label>Group Name</label><input id="cg-name" placeholder="e.g. Bhai Log Fantasy"/></div>
     </div>
     <button class="btn btn-primary" onclick="createGroup()">&#128279; Create Group</button>
+  </div>
+  <div class="card">
+    <div class="card-title">&#128101; Join a Group</div>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:12px;">Enter the group invite code, paste the invite link, or scan a QR code.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <input id="join-code-input" placeholder="Paste code or invite link" style="flex:1;min-width:180px;"/>
+      <button class="btn btn-primary" onclick="joinByCodeInput()">&#128279; Join</button>
+      <button class="btn" style="background:linear-gradient(135deg,#7c4dff,#00e5ff);color:#fff;" onclick="openScanner()">&#128247; Scan QR</button>
+    </div>
   </div>
   <div class="card">
     <div class="card-title">&#128101; Available Groups</div>
@@ -488,6 +498,68 @@ function checkStorageSpace() {
   }
 }
 
+// Data safety testing
+function testDataSafety() {
+  console.log('=== DATA SAFETY CHECK ===');
+  
+  // Test localStorage
+  try {
+    var testKey = 'safety_test_' + Date.now();
+    var testValue = 'test_data_' + Math.random();
+    localStorage.setItem(testKey, testValue);
+    var retrieved = localStorage.getItem(testKey);
+    localStorage.removeItem(testKey);
+    
+    if (retrieved === testValue) {
+      console.log('localStorage: SAFE');
+    } else {
+      console.log('localStorage: WARNING - Possible corruption');
+    }
+  } catch (error) {
+    console.log('localStorage: ERROR -', error.message);
+  }
+  
+  // Test IndexedDB
+  if (db) {
+    console.log('IndexedDB: AVAILABLE - Maximum protection');
+  } else {
+    console.log('IndexedDB: NOT AVAILABLE - Using localStorage only');
+  }
+  
+  // Check current data
+  try {
+    var currentData = localStorage.getItem('ipl2026_v2');
+    if (currentData) {
+      var parsed = JSON.parse(currentData);
+      console.log('Current data status: SAFE');
+      console.log('Groups:', Object.keys(parsed.groups || {}).length);
+      console.log('Users:', Object.keys(parsed.users || {}).length);
+    }
+  } catch (error) {
+    console.log('Data validation: ERROR - Will attempt recovery');
+  }
+}
+
+// Emergency backup function
+function createEmergencyBackup() {
+  var backupData = {
+    state: state,
+    timestamp: new Date().toISOString(),
+    storageMode: storageMode
+  };
+  
+  var dataStr = JSON.stringify(backupData, null, 2);
+  var dataBlob = new Blob([dataStr], {type: 'application/json'});
+  var url = URL.createObjectURL(dataBlob);
+  
+  var link = document.createElement('a');
+  link.href = url;
+  link.download = 'ipl_fantasy_tracker_backup_' + new Date().toISOString().split('T')[0] + '.json';
+  link.click();
+  
+  console.log('Emergency backup created and downloaded');
+}
+
 // Initialize storage system
 initIndexedDB().then(function(indexedDBAvailable) {
   if (indexedDBAvailable) {
@@ -498,6 +570,7 @@ initIndexedDB().then(function(indexedDBAvailable) {
   load().then(function() {
     console.log('Storage system ready');
     checkStorageSpace();
+    testDataSafety(); // Run safety check
   });
 });
 
@@ -513,10 +586,109 @@ var firebaseConfig = {
   projectId: "ipl-fantasy-tracker-9baf1",
   storageBucket: "ipl-fantasy-tracker-9baf1.firebasestorage.app",
   messagingSenderId: "875339224255",
-  appId: "1:875339224255:web:d616bdf93abc648df7a20a"
+  appId: "1:875339224255:web:d616bdf93abc648df7a20a",
+  databaseURL: "https://ipl-fantasy-tracker-9baf1-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 firebase.initializeApp(firebaseConfig);
 var googleProvider = new firebase.auth.GoogleAuthProvider();
+
+// ═══════════════════════════════════════
+// REALTIME DATABASE (Singapore)
+// ═══════════════════════════════════════
+var rtdb = firebase.database();
+
+// Save group to Realtime Database
+async function saveGroupToCloud(gid) {
+  if (!gid || !state.groups[gid]) return;
+  try {
+    var g = state.groups[gid];
+    await rtdb.ref('groups/' + gid).set({
+      id: g.id,
+      name: g.name,
+      admin: g.admin,
+      members: g.members || [],
+      entries: g.entries || [],
+      created: g.created || new Date().toISOString(),
+      lastUpdated: Date.now()
+    });
+    console.log('✅ Group saved to Realtime DB:', gid);
+  } catch (err) {
+    console.warn('❌ Realtime DB save failed (offline?):', err.message);
+  }
+}
+
+// Load group from Realtime Database
+async function loadGroupFromCloud(gid) {
+  if (!gid) return false;
+  try {
+    var snapshot = await rtdb.ref('groups/' + gid).get();
+    if (snapshot.exists()) {
+      state.groups[gid] = snapshot.val();
+      save();
+      console.log('✅ Group loaded from Realtime DB:', gid);
+      return true;
+    }
+  } catch (err) {
+    console.warn('❌ Realtime DB load failed (offline?):', err.message);
+  }
+  return false;
+}
+
+// Load all groups the current user is a member of
+async function loadAllGroupsFromCloud() {
+  if (!state.currentUser) return;
+  try {
+    var snapshot = await rtdb.ref('groups').get();
+    if (snapshot.exists()) {
+      var allGroups = snapshot.val();
+      Object.keys(allGroups).forEach(function(gid) {
+        var g = allGroups[gid];
+        var members = g.members || [];
+        if (members.indexOf(state.currentUser) >= 0) {
+          state.groups[gid] = g;
+        }
+      });
+      save();
+      console.log('✅ All groups synced from Realtime DB');
+    }
+  } catch (err) {
+    console.warn('❌ Realtime DB groups load failed:', err.message);
+  }
+}
+
+// Real-time listener — auto refresh when any group member adds data
+var activeListenerRef = null;
+function setupRealtimeListener(gid) {
+  if (activeListenerRef) {
+    activeListenerRef.off(); // unsubscribe old listener
+    activeListenerRef = null;
+  }
+  if (!gid) return;
+  activeListenerRef = rtdb.ref('groups/' + gid);
+  activeListenerRef.on('value', function(snapshot) {
+    if (snapshot.exists()) {
+      state.groups[gid] = snapshot.val();
+      save();
+      renderAll();
+      console.log('🔄 Real-time update received from Realtime DB');
+    }
+  }, function(err) {
+    console.warn('❌ Realtime DB listener error:', err.message);
+  });
+}
+
+// Save user profile to Realtime Database
+async function saveUserToCloud(uid) {
+  if (!uid || !state.users[uid]) return;
+  try {
+    await rtdb.ref('users/' + uid).update({
+      ...state.users[uid],
+      lastSeen: Date.now()
+    });
+  } catch (err) {
+    console.warn('❌ User save to Realtime DB failed:', err.message);
+  }
+}
 
 function authAlert(msg,ok){var a=document.getElementById('auth-alert');a.textContent=msg;a.className='auth-alert '+(ok?'ok':'err');a.style.display='block';}
 
@@ -532,6 +704,7 @@ function handleAuthSuccess(user) {
   }
   state.currentUser = uid;
   save();
+  saveUserToCloud(uid);
   afterLogin();
 }
 
@@ -598,8 +771,10 @@ function createGroup(){
   if(!name){showGrpAlert('Enter a group name.','error');return;}
   var id=Math.random().toString(36).substr(2,8).toUpperCase();
   state.groups[id]={id:id,name:name,admin:state.currentUser,members:[state.currentUser],entries:[],created:new Date().toISOString()};
-  save();document.getElementById('cg-name').value='';
-  showGrpAlert('Group "'+name+'" created!','success');renderGroupsList();
+  save();
+  saveGroupToCloud(id); // ← Firestore sync
+  document.getElementById('cg-name').value='';
+  showGrpAlert('Group "'+name+'" created! (Synced to cloud ☁️)','success');renderGroupsList();
 }
 function renderGroupsList(){
   var el=document.getElementById('groups-list');
@@ -617,15 +792,33 @@ function renderGroupsList(){
     +'</div>';
   }).join('');
 }
-function joinGroup(gid){
+async function joinGroup(gid){
+  // First try to load from Firestore (for joining someone else's group via invite)
+  if (!state.groups[gid]) {
+    var loaded = await loadGroupFromCloud(gid);
+    if (!loaded) { showGrpAlert('Group not found!', 'error'); return; }
+  }
   var g=state.groups[gid];if(!g)return;
-  if(g.members.indexOf(state.currentUser)<0){g.members.push(state.currentUser);save();}
+  if(g.members.indexOf(state.currentUser)<0){
+    g.members.push(state.currentUser);
+    save();
+    saveGroupToCloud(gid); // ← sync updated members to Firestore
+  }
   renderGroupsList();
 }
-function enterGroup(gid){
-  state.activeGroup=gid;save();showPage('page-app');initApp();
+async function enterGroup(gid){
+  state.activeGroup=gid;
+  save();
+  // Load latest data from Firestore before entering
+  await loadGroupFromCloud(gid);
+  setupRealtimeListener(gid); // ← Live updates from other members
+  showPage('page-app');
+  initApp();
 }
-function leaveGroup(){state.activeGroup=null;save();showPage('page-groups');initGroupsPage();}
+function leaveGroup(){
+  if(activeListenerRef){activeListenerRef.off();activeListenerRef=null;} // stop listener
+  state.activeGroup=null;save();showPage('page-groups');initGroupsPage();
+}
 function showGrpAlert(m,t){var e=document.getElementById('grp-alert');e.textContent=m;e.className='alert alert-'+t;e.style.display='block';setTimeout(function(){e.style.display='none';},3000);}
 
 // ═══════════════════════════════════════
@@ -732,7 +925,8 @@ function submitMatch(){
   });
   if(!count){showAlert('entry-alert','Enter team name & points for at least 1 member.','error');return;}
   save();
-  showAlert('entry-alert','Match #'+mNum+' saved! '+count+' member entries added.','success');
+  saveGroupToCloud(state.activeGroup); // ← Firestore sync on every match entry
+  showAlert('entry-alert','Match #'+mNum+' saved! '+count+' entries synced to cloud ☁️','success');
   clearMatchForm();renderAll();
 }
 function renderEntries(){
@@ -972,29 +1166,117 @@ function useScheduleMatch(){
 // QR SCANNER
 // ═══════════════════════════════════════
 var qrScanner=null;
-function openScanner(){document.getElementById('modal-scanner').classList.remove('hidden');}
-function closeScanner(){document.getElementById('modal-scanner').classList.add('hidden');if(qrScanner){qrScanner.stop().catch(function(){});qrScanner=null;}}
-function joinByCode(){var v=document.getElementById('manual-code').value.trim();if(!v)return;closeScanner();var gid=v.indexOf('join=')>=0?v.split('join=')[1].split('&')[0].toUpperCase():v.toUpperCase();if(state.groups[gid]){joinGroup(gid);renderGroupsList();alert('Joined!');}else{alert('Group not found: '+gid);}}
+function openScanner(){
+  document.getElementById('modal-scanner').classList.remove('hidden');
+  startQRScanner();
+}
+function closeScanner(){
+  document.getElementById('modal-scanner').classList.add('hidden');
+  if(qrScanner){qrScanner.stop().catch(function(){});qrScanner=null;}
+}
+function startQRScanner(){
+  if(typeof Html5Qrcode==='undefined'){return;}
+  var qrEl=document.getElementById('qr-reader');
+  qrEl.innerHTML='';
+  qrScanner=new Html5Qrcode('qr-reader');
+  Html5Qrcode.getCameras().then(function(devices){
+    if(!devices||!devices.length){qrEl.innerHTML='<p style="color:var(--red);padding:12px;">No camera found.</p>';return;}
+    qrScanner.start(
+      {facingMode:'environment'},
+      {fps:10,qrbox:{width:220,height:220}},
+      function(decodedText){
+        closeScanner();
+        handleJoinCode(decodedText);
+      },
+      function(){}
+    ).catch(function(err){
+      qrEl.innerHTML='<p style="color:var(--red);padding:12px;">Camera blocked: '+err+'</p>';
+    });
+  }).catch(function(err){
+    qrEl.innerHTML='<p style="color:var(--red);padding:12px;">Camera error: '+err+'</p>';
+  });
+}
+
+// Handle join from QR scanner modal manual input
+async function joinByCode(){
+  var v=document.getElementById('manual-code').value.trim();
+  if(!v)return;
+  closeScanner();
+  await handleJoinCode(v);
+}
+
+// Handle join from groups page input
+async function joinByCodeInput(){
+  var v=document.getElementById('join-code-input').value.trim();
+  if(!v){showGrpAlert('Please enter a code or link.','error');return;}
+  await handleJoinCode(v);
+  document.getElementById('join-code-input').value='';
+}
+
+// Core join handler — works from URL, QR, or manual code
+async function handleJoinCode(raw){
+  var gid=raw.indexOf('join=')>=0?raw.split('join=')[1].split('&')[0].toUpperCase():raw.toUpperCase().trim();
+  if(!gid){showGrpAlert('Invalid code.','error');return;}
+  if(!state.currentUser){alert('Please login first, then use the invite link again.');return;}
+  // Try local first
+  if(!state.groups[gid]){
+    showGrpAlert('Looking up group in cloud...','success');
+    var loaded=await loadGroupFromCloud(gid);
+    if(!loaded){showGrpAlert('Group not found: '+gid,'error');return;}
+  }
+  await joinGroup(gid);
+  renderGroupsList();
+  showGrpAlert('Joined group successfully! ✅','success');
+}
 
 // ═══════════════════════════════════════
 // URL JOIN
 // ═══════════════════════════════════════
-function checkURLJoin(){
-  try{var p=new URLSearchParams(window.location.search);var jid=p.get('join');
-  if(jid&&state.groups[jid.toUpperCase()]){
-    if(!state.currentUser){alert('Please login first, then use the invite link again.');return;}
-    joinGroup(jid.toUpperCase());state.activeGroup=jid.toUpperCase();save();showPage('page-app');initApp();
-  }}catch(e){}
+async function checkURLJoin(){
+  try{
+    var p=new URLSearchParams(window.location.search);
+    var jid=p.get('join');
+    if(!jid)return;
+    jid=jid.toUpperCase();
+    // Wait for auth before joining
+    if(!state.currentUser){
+      // Store pending join for after login
+      sessionStorage.setItem('pending_join',jid);
+      return;
+    }
+    await handleJoinCode(jid);
+    if(state.groups[jid]){
+      state.activeGroup=jid;
+      save();
+      showPage('page-app');
+      initApp();
+    }
+  }catch(e){console.warn('URL join error:',e);}
 }
 
 // ═══════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════
 // Check Firebase auth state
-firebase.auth().onAuthStateChanged(function(user){
-  if(user && state.users[user.uid]){
+firebase.auth().onAuthStateChanged(async function(user){
+  if(user){
     state.currentUser = user.uid;
+    if(!state.users[user.uid]){
+      var displayFallback = user.email ? user.email.split('@')[0] : 'User';
+      state.users[user.uid] = {display: user.displayName||displayFallback, photo: user.photoURL||'', email: user.email||'', created: new Date().toISOString()};
+    }
     save();
+    // Sync all groups from Firestore on login
+    await loadAllGroupsFromCloud();
+    // Handle any pending join from URL
+    var pendingJoin=sessionStorage.getItem('pending_join');
+    if(pendingJoin){
+      sessionStorage.removeItem('pending_join');
+      await handleJoinCode(pendingJoin);
+      if(state.groups[pendingJoin]){
+        state.activeGroup=pendingJoin;save();showPage('page-app');initApp();return;
+      }
+    }
     afterLogin();
   } else if(state.currentUser && state.users[state.currentUser]){
     afterLogin();
