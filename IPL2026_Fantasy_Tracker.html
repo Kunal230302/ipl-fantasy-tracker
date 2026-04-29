@@ -28,7 +28,7 @@ body{font-family:'Inter',sans-serif;background:var(--light);color:var(--text);fo
 .home-card{background:rgba(26,10,62,.85);backdrop-filter:blur(20px);border:1px solid rgba(124,77,255,.3);border-radius:24px;padding:48px 40px;max-width:440px;width:94%;text-align:center;box-shadow:0 24px 80px rgba(124,77,255,.15);animation:slideUp .4s;}
 @keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:translateY(0);opacity:1}}
 .home-card .logo{margin-bottom:12px;}
-.home-card .logo img{width:220px;height:auto;filter:drop-shadow(0 4px 24px rgba(124,77,255,.5));}
+.home-card .logo img{width:150px;height:150px;object-fit:cover;border-radius:50%;border:3px solid var(--purple);filter:drop-shadow(0 4px 24px rgba(124,77,255,.5));}
 .home-card h1{font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--green);letter-spacing:2px;text-shadow:0 0 20px rgba(0,230,118,.3);}
 .home-card .sub{color:var(--muted);font-size:13px;margin-bottom:28px;}
 .home-card input{width:100%;padding:12px 16px;border:2px solid var(--border);border-radius:10px;font-size:14px;margin-bottom:12px;font-family:'Inter',sans-serif;transition:border .2s;background:rgba(255,255,255,.05);color:#fff;}
@@ -139,7 +139,7 @@ tr:hover td{background:rgba(124,77,255,.08);}
 .schedule-card .match-venue{font-size:10px;color:var(--muted);}
 .schedule-filter{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
 .schedule-filter select{max-width:200px;}
-.header-logo{width:42px;height:42px;border-radius:50%;background:transparent;padding:0;filter:drop-shadow(0 0 8px rgba(124,77,255,.5));}
+.header-logo{width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid var(--purple);background:transparent;padding:0;filter:drop-shadow(0 0 8px rgba(124,77,255,.5));}
 
 @media(max-width:600px){
   .header{padding:12px 16px;flex-wrap:wrap;}
@@ -199,9 +199,13 @@ tr:hover td{background:rgba(124,77,255,.08);}
     <div class="card-title">&#128279; Create New Group</div>
     <div id="grp-alert" class="alert"></div>
     <div class="form-grid">
-      <div><label>Group Name</label><input id="cg-name" placeholder="e.g. Bhai Log Fantasy"/></div>
+      <div>
+        <label>Group Name</label>
+        <input id="cg-name" placeholder="e.g. Bhai Log Fantasy" oninput="checkGroupName()"/>
+        <div id="cg-name-msg" style="font-size:11px;margin-top:4px;"></div>
+      </div>
     </div>
-    <button class="btn btn-primary" onclick="createGroup()">&#128279; Create Group</button>
+    <button id="cg-btn" class="btn btn-primary" onclick="createGroup()">&#128279; Create Group</button>
   </div>
   <div class="card">
     <div class="card-title">&#128101; Join a Group</div>
@@ -255,8 +259,9 @@ tr:hover td{background:rgba(124,77,255,.08);}
     <div class="card-title">&#9999;&#65039; Enter Match Points (All Members)</div>
     <div id="entry-alert" class="alert"></div>
     <div class="form-grid">
-      <div><label>Match Name / Title</label><input id="m-name" placeholder="e.g. MI vs CSK"/></div>
-      <div><label>Match Number</label><input id="m-num" type="number" min="1" max="100" placeholder="e.g. 41"/></div>
+      <div><label>Select Match</label><select id="m-select" onchange="autoFillMatch()"><option value="">-- Choose Match --</option></select></div>
+      <div style="display:none;"><label>Match Name</label><input id="m-name" readonly/></div>
+      <div style="display:none;"><label>Match Number</label><input id="m-num" type="number" readonly/></div>
     </div>
     <div style="margin-top:16px;">
       <div style="font-weight:700;font-size:14px;color:var(--blue);margin-bottom:10px;">&#128101; Members &mdash; Enter each member's team &amp; points</div>
@@ -766,14 +771,31 @@ function initGroupsPage(){
   document.getElementById('grp-username').textContent=getDisplay();
   renderGroupsList();
 }
+function checkGroupName(){
+  var name=document.getElementById('cg-name').value.trim().toLowerCase();
+  var msg=document.getElementById('cg-name-msg');
+  var btn=document.getElementById('cg-btn');
+  if(!name){msg.innerHTML='';btn.disabled=false;btn.style.opacity=1;return;}
+  var exists=Object.values(state.groups).some(function(g){return g.name.toLowerCase()===name;});
+  if(exists){
+    msg.innerHTML='<span style="color:var(--red);">&#10008; This group name already exists. Please choose another.</span>';
+    btn.disabled=true;btn.style.opacity=0.5;
+  }else{
+    msg.innerHTML='<span style="color:var(--green);">&#10004; Name is available!</span>';
+    btn.disabled=false;btn.style.opacity=1;
+  }
+}
 function createGroup(){
   var name=document.getElementById('cg-name').value.trim();
   if(!name){showGrpAlert('Enter a group name.','error');return;}
+  var exists=Object.values(state.groups).some(function(g){return g.name.toLowerCase()===name.toLowerCase();});
+  if(exists){showGrpAlert('Group name already exists!','error');return;}
   var id=Math.random().toString(36).substr(2,8).toUpperCase();
   state.groups[id]={id:id,name:name,admin:state.currentUser,members:[state.currentUser],entries:[],created:new Date().toISOString()};
   save();
   saveGroupToCloud(id); // ← Firestore sync
   document.getElementById('cg-name').value='';
+  document.getElementById('cg-name-msg').innerHTML='';
   showGrpAlert('Group "'+name+'" created! (Synced to cloud ☁️)','success');renderGroupsList();
 }
 function renderGroupsList(){
@@ -787,10 +809,23 @@ function renderGroupsList(){
       +'<div class="group-card-name">'+g.name+'</div>'
       +'<div class="group-card-meta">Admin: <b>'+((state.users[g.admin]||{}).display||g.admin)+'</b> | Members: <b>'+g.members.length+'</b> | Code: <code style="background:#F1F5F9;padding:1px 6px;border-radius:4px;font-size:11px;">'+g.id+'</code></div>'
       +'<div class="group-actions">'
-        +(isMember?'<button class="btn-grp btn-grp-main" onclick="enterGroup(\''+g.id+'\')">&#9654; Enter Group</button>':'<button class="btn-grp" onclick="joinGroup(\''+g.id+'\')">&#128101; Join</button>')
+        +(isMember?
+          '<button class="btn-grp btn-grp-main" onclick="enterGroup(\''+g.id+'\')">&#9654; Enter Group</button>' +
+          (g.admin===state.currentUser?'':'<button class="btn-grp" style="color:var(--red);border-color:rgba(255,82,82,0.3);background:rgba(255,82,82,0.1);" onclick="exitGroup(\''+g.id+'\')">Leave</button>')
+        :'<button class="btn-grp" onclick="joinGroup(\''+g.id+'\')">&#128101; Join</button>')
       +'</div>'
     +'</div>';
   }).join('');
+}
+function exitGroup(gid){
+  if(!confirm('Are you sure you want to permanently leave this group?'))return;
+  var g=state.groups[gid];
+  if(g && g.admin !== state.currentUser){
+    g.members = g.members.filter(function(m){return m !== state.currentUser;});
+    save();
+    saveGroupToCloud(gid);
+    renderGroupsList();
+  }
 }
 async function joinGroup(gid){
   // First try to load from Firestore (for joining someone else's group via invite)
@@ -846,7 +881,7 @@ function showAlert(id,msg,type){var e=document.getElementById(id);e.textContent=
 // ═══════════════════════════════════════
 function getEntries(){var g=state.groups[state.activeGroup];return (g&&g.entries)?g.entries:[];}
 
-function renderAll(){renderMetrics();renderDashLB();renderRecent();populateMemberRows();renderEntries();renderLeaderboard();renderPDFSelect();renderInvite();renderSchedule();}
+function renderAll(){renderMetrics();renderDashLB();renderRecent();populateMemberRows();renderEntries();renderLeaderboard();renderPDFSelect();renderInvite();renderSchedule();populateMatchSelect();}
 
 function renderMetrics(){
   var entries=getEntries();
@@ -892,22 +927,45 @@ function populateMemberRows(){
   // Only rebuild if member count changed
   if(el.dataset.count==g.members.length)return;
   el.dataset.count=g.members.length;
+  
+  var teamOpts = '<option value="">- Select Team -</option>' +
+    '<optgroup label="IPL Teams">' + Object.values(TEAM_FULL).filter(function(x){return x!=='TBD'}).map(function(t){return '<option>'+t+'</option>'}).join('') + '</optgroup>' +
+    '<optgroup label="Custom Teams">' + [1,2,3,4,5,6,7,8,9,10].map(function(n){return '<option>Team '+(n<10?'0':'')+n+'</option>'}).join('') + '</optgroup>';
+
   el.innerHTML=g.members.map(function(uid,i){
     var display=(state.users[uid]||{}).display||uid;
     return '<tr style="border-bottom:1px solid var(--border);">'
       +'<td style="padding:10px 8px;"><b style="color:var(--blue);font-size:14px;">'+display+'</b></td>'
-      +'<td style="padding:10px 8px;"><input id="me-team-'+i+'" placeholder="e.g. Mumbai Indians" style="width:100%;"/></td>'
+      +'<td style="padding:10px 8px;"><select id="me-team-'+i+'" style="width:100%;">'+teamOpts+'</select></td>'
       +'<td style="padding:10px 8px;"><input id="me-pts-'+i+'" type="number" step="0.5" min="0" placeholder="0" style="width:100%;"/></td>'
       +'</tr>';
   }).join('');
 }
 function clearMatchForm(){
   document.getElementById('m-name').value='';document.getElementById('m-num').value='';
+  document.getElementById('m-select').value='';
   var g=state.groups[state.activeGroup];if(!g)return;
   g.members.forEach(function(uid,i){
     var t=document.getElementById('me-team-'+i);if(t)t.value='';
     var p=document.getElementById('me-pts-'+i);if(p)p.value='';
   });
+}
+function populateMatchSelect(){
+  var sel=document.getElementById('m-select');if(!sel)return;
+  if(sel.options.length>1)return; // Already populated
+  if(typeof IPL_SCHEDULE === 'undefined')return;
+  sel.innerHTML='<option value="">-- Choose Match --</option>'+IPL_SCHEDULE.map(function(m){
+    return '<option value="'+m.m+'">M'+m.m+': '+(TEAM_FULL[m.t1]||m.t1)+' vs '+(TEAM_FULL[m.t2]||m.t2)+'</option>';
+  }).join('');
+}
+function autoFillMatch(){
+  var val=document.getElementById('m-select').value;
+  if(!val){document.getElementById('m-name').value='';document.getElementById('m-num').value='';return;}
+  var m=IPL_SCHEDULE.find(function(x){return x.m==val;});
+  if(m){
+    document.getElementById('m-name').value=(TEAM_FULL[m.t1]||m.t1)+' vs '+(TEAM_FULL[m.t2]||m.t2);
+    document.getElementById('m-num').value=m.m;
+  }
 }
 function submitMatch(){
   var mName=document.getElementById('m-name').value.trim();
@@ -1155,8 +1213,8 @@ function selectSchMatch(num){
 function useScheduleMatch(){
   if(!selectedSchMatch)return;
   var m=selectedSchMatch;
-  document.getElementById('m-name').value=(TEAM_FULL[m.t1]||m.t1)+' vs '+(TEAM_FULL[m.t2]||m.t2);
-  document.getElementById('m-num').value=m.m;
+  document.getElementById('m-select').value=m.m;
+  autoFillMatch();
   showTab('entry',document.querySelectorAll('.tab-btn')[1]);
 }
 
@@ -1216,6 +1274,12 @@ async function handleJoinCode(raw){
   var gid=raw.indexOf('join=')>=0?raw.split('join=')[1].split('&')[0].toUpperCase():raw.toUpperCase().trim();
   if(!gid){showGrpAlert('Invalid code.','error');return;}
   if(!state.currentUser){alert('Please login first, then use the invite link again.');return;}
+  
+  if(state.groups[gid] && state.groups[gid].members.indexOf(state.currentUser)>=0){
+    showGrpAlert('You are already a member of this group!','success');
+    return;
+  }
+  
   // Try local first
   if(!state.groups[gid]){
     showGrpAlert('Looking up group in cloud...','success');
