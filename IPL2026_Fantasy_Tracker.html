@@ -204,6 +204,7 @@ tr:hover td{background:rgba(255,103,31,0.03);}
   </div>
 </div>
 </div>
+</div>
 <!-- ══════ PAGE: GROUPS ══════ -->
 <div id="page-groups" class="page">
 <div class="header">
@@ -794,6 +795,10 @@ function getUserPhoto(){
   var u=state.users[state.currentUser];
   return u&&u.photo?u.photo:'';
 }
+function getMemberName(uid){
+  var u=state.users[uid];
+  return (u && u.display) ? u.display : uid;
+}
 
 // ═══════════════════════════════════════
 // PAGES
@@ -980,14 +985,6 @@ function removeMember(uid) {
 function initGroupsPage(){
   document.getElementById('grp-username').textContent=getDisplay();
   renderGroupsList();
-}
-function createGroup(){
-  var name=document.getElementById('cg-name').value.trim();
-  if(!name){showGrpAlert('Enter a group name.','error');return;}
-  var id=Math.random().toString(36).substr(2,8).toUpperCase();
-  state.groups[id]={id:id,name:name,admin:state.currentUser,members:[state.currentUser],entries:[],created:new Date().toISOString()};
-  save();document.getElementById('cg-name').value='';
-  showGrpAlert('Group "'+name+'" created!','success');renderGroupsList();
 }
 function checkGroupName(){
   var name=document.getElementById('cg-name').value.trim().toLowerCase();
