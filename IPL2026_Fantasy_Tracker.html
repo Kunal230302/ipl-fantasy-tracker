@@ -160,12 +160,28 @@ tr:hover td{background:rgba(124,77,255,.08);}
   <h1>TATA IPL 2026</h1>
   <p class="sub">Fantasy Points Tracker &bull; 74 Matches &bull; 10 Teams</p>
   <div id="auth-alert" class="auth-alert"></div>
+  
+  <div id="email-auth-section" style="margin-top:16px;">
+    <input type="email" id="auth-email" placeholder="Email Address" />
+    <input type="password" id="auth-password" placeholder="Password" />
+    
+    <div style="display:flex; gap: 10px; margin-top: 8px;">
+      <button class="btn-main" onclick="emailSignIn()" style="flex:1;">Login</button>
+      <button class="btn-main btn-orange" onclick="emailSignUp()" style="flex:1;">Sign Up</button>
+    </div>
+  </div>
+
+  <div style="margin: 18px 0; display:flex; align-items:center; gap:12px;">
+    <div style="flex:1; height:1px; background:var(--border);"></div>
+    <span style="color:var(--muted); font-size:12px; font-weight:600;">OR</span>
+    <div style="flex:1; height:1px; background:var(--border);"></div>
+  </div>
+
   <div style="margin-top:8px;">
-    <button class="btn-main" onclick="googleSignIn()" style="display:flex;align-items:center;justify-content:center;gap:10px;">
+    <button class="btn-main" onclick="googleSignIn()" style="display:flex;align-items:center;justify-content:center;gap:10px; background:rgba(255,255,255,0.05); border:1px solid var(--border); color:#fff; box-shadow:none;">
       <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" width="20" height="20" style="background:#fff;border-radius:50%;padding:2px;"/>
-      Sign in with Google
+      Continue with Google
     </button>
-    <p style="color:var(--muted);font-size:11px;margin-top:14px;">Secure login via your Google account</p>
   </div>
 </div>
 </div>
@@ -347,20 +363,44 @@ var googleProvider = new firebase.auth.GoogleAuthProvider();
 
 function authAlert(msg,ok){var a=document.getElementById('auth-alert');a.textContent=msg;a.className='auth-alert '+(ok?'ok':'err');a.style.display='block';}
 
+function handleAuthSuccess(user) {
+  var uid = user.uid;
+  var displayFallback = user.email ? user.email.split('@')[0] : 'User';
+  // Save user info
+  if(!state.users[uid]){
+    state.users[uid] = {display: user.displayName||displayFallback, photo: user.photoURL||'', email: user.email||'', created: new Date().toISOString()};
+  } else {
+    state.users[uid].display = user.displayName||state.users[uid].display||displayFallback;
+    state.users[uid].photo = user.photoURL||state.users[uid].photo||'';
+  }
+  state.currentUser = uid;
+  save();
+  afterLogin();
+}
+
+function emailSignUp() {
+  var email = document.getElementById('auth-email').value.trim();
+  var pass = document.getElementById('auth-password').value;
+  if(!email || !pass) { authAlert('Please enter email and password.', 0); return; }
+  
+  firebase.auth().createUserWithEmailAndPassword(email, pass)
+    .then(function(result) { handleAuthSuccess(result.user); })
+    .catch(function(error) { authAlert(error.message, 0); });
+}
+
+function emailSignIn() {
+  var email = document.getElementById('auth-email').value.trim();
+  var pass = document.getElementById('auth-password').value;
+  if(!email || !pass) { authAlert('Please enter email and password.', 0); return; }
+  
+  firebase.auth().signInWithEmailAndPassword(email, pass)
+    .then(function(result) { handleAuthSuccess(result.user); })
+    .catch(function(error) { authAlert(error.message, 0); });
+}
+
 function googleSignIn(){
   firebase.auth().signInWithPopup(googleProvider).then(function(result){
-    var user = result.user;
-    var uid = user.uid;
-    // Save user info
-    if(!state.users[uid]){
-      state.users[uid] = {display: user.displayName||user.email, photo: user.photoURL||'', email: user.email||'', created: new Date().toISOString()};
-    } else {
-      state.users[uid].display = user.displayName||state.users[uid].display;
-      state.users[uid].photo = user.photoURL||'';
-    }
-    state.currentUser = uid;
-    save();
-    afterLogin();
+    handleAuthSuccess(result.user);
   }).catch(function(error){
     authAlert(error.message || 'Google sign-in failed.',0);
   });
