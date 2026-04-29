@@ -958,10 +958,8 @@ function renderInvite(){
   var base=window.location.href.split('?')[0].split('#')[0];
   inviteLink=base+'?join='+gid;
   document.getElementById('invite-link').textContent=inviteLink;
-  var qrEl=document.getElementById('invite-qr');qrEl.innerHTML='';
-  try{if(typeof QRCode!=='undefined'){new QRCode(qrEl,{text:inviteLink,width:220,height:220,colorDark:'#003366',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.H});}
-  else{qrEl.innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent(inviteLink)+'" width="220" height="220" style="border-radius:10px;"/>';}}
-  catch(e){qrEl.innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent(inviteLink)+'" width="220" height="220" style="border-radius:10px;"/>';}
+  var qrEl=document.getElementById('invite-qr');
+  qrEl.innerHTML='<img src="https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&color=1a0a3e&data='+encodeURIComponent(inviteLink)+'" width="220" height="220" style="border-radius:12px; border:2px solid var(--border); background:#fff; padding:4px;"/>';
 }
 function copyLink(){if(!inviteLink)return;navigator.clipboard.writeText(inviteLink).catch(function(){});alert('Link copied!');}
 function shareWA(){if(!inviteLink)return;var g=state.groups[state.activeGroup];var t='Join "'+g.name+'" on IPL 2026 Fantasy Tracker!\n'+inviteLink;window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');}
