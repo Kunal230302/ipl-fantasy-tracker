@@ -1,14 +1,4 @@
 {
   "version": 2,
-  "name": "ipl-fantasy-tracker",
-  "routes": [
-    {
-      "src": "/",
-      "dest": "/IPL2026_Fantasy_Tracker.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/IPL2026_Fantasy_Tracker.html"
-    }
-  ]
+  "name": "ipl-fantasy-tracker"
 }
