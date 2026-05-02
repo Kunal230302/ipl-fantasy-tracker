@@ -312,9 +312,14 @@ tr:hover td{background:rgba(255,103,31,0.03);}
     <!-- Live Score Display -->
     <div id="live-score-display" style="display:none; margin-top:16px; padding:16px; background:var(--light); border-radius:10px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <div>
-          <h3 id="live-match-name" style="color:var(--saffron); margin-bottom:4px;"></h3>
-          <p id="live-match-status" style="font-size:12px; color:var(--muted);"></p>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div id="match-poster" style="width:60px; height:60px; border-radius:8px; background:var(--border); display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:10px; text-align:center;">
+            📺
+          </div>
+          <div>
+            <h3 id="live-match-name" style="color:var(--saffron); margin-bottom:4px;"></h3>
+            <p id="live-match-status" style="font-size:12px; color:var(--muted);"></p>
+          </div>
         </div>
         <div id="live-score" style="font-size:24px; font-weight:700; color:var(--saffron);"></div>
       </div>
@@ -1082,6 +1087,11 @@ async function loadFantasyMatches() {
         return '<option value="' + m.id + '">' + status + ' ' + teams + '</option>';
       }).join('');
       
+    // Load poster for first match
+    if (matches.length > 0) {
+      loadMatchPoster(matches[0]);
+    }
+      
     console.log('Loaded ' + matches.length + ' IPL matches from ESPN');
     showAlert('fantasy-alert', 'Successfully loaded ' + matches.length + ' IPL matches from ESPN!', 'success');
   } catch (error) {
@@ -1110,6 +1120,9 @@ async function loadFantasyMatch() {
     document.getElementById('live-match-name').textContent = matchName;
     document.getElementById('live-match-status').textContent = matchStatus;
     document.getElementById('live-score-display').style.display = 'block';
+    
+    // Load poster for selected match
+    loadMatchPoster(matchDetails);
   } else {
     showAlert('fantasy-alert', 'Could not load match details from ESPN. The match may not have started yet.', 'error');
   }
@@ -1356,6 +1369,42 @@ function updateFantasyLeaderboard(fantasyData) {
       '<td>' + player.role + '</td>' +
     '</tr>';
   }).join('');
+}
+
+// Load match poster
+function loadMatchPoster(match) {
+  var posterDiv = document.getElementById('match-poster');
+  if (!posterDiv || !match) return;
+  
+  // Generate poster based on teams
+  var teams = match.competitions && match.competitions[0] ? match.competitions[0].competitors : [];
+  var team1 = teams[0] ? teams[0].displayName || teams[0].name : 'Team 1';
+  var team2 = teams[1] ? teams[1].displayName || teams[1].name : 'Team 2';
+  
+  // Create team colors and logos
+  var teamLogos = {
+    'MI': '🔵',
+    'CSK': '🟡', 
+    'RCB': '🔴',
+    'KKR': '🟣',
+    'DC': '🔷',
+    'SRH': '🟠',
+    'RR': '🟢',
+    'PBKS': '🟦',
+    'LSG': '🟪',
+    'GT': '🟧'
+  };
+  
+  var logo1 = teamLogos[team1.split(' ').pop()] || '🏏�';
+  var logo2 = teamLogos[team2.split(' ').pop()] || '🏏�';
+  
+  // Create poster HTML
+  posterDiv.innerHTML = '<div style="background:linear-gradient(135deg, #FF671F, #FF9933); color:white; padding:8px; border-radius:8px; text-align:center; font-weight:bold; font-size:11px;">' +
+    '<div style="font-size:18px; margin-bottom:4px;">' + logo1 + ' ' + team1 + '</div>' +
+    '<div style="font-size:24px; margin:8px 0;">VS</div>' +
+    '<div style="font-size:18px; margin-top:4px;">' + logo2 + ' ' + team2 + '</div>' +
+    '<div style="font-size:10px; margin-top:8px; opacity:0.8;">IPL 2026</div>' +
+  '</div>';
 }
 
 // ═══════════════════════════════════════
