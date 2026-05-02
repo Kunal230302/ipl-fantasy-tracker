@@ -1,9 +1,10 @@
-// CREX Integration - Live Scores and Lineups
-// This module handles fetching live cricket data and calculating fantasy points
+// ESPN API Integration - Live Scores and Lineups
+// This module handles fetching cricket data from ESPN's public API
 
-// Configuration
-var CREX_API_KEY = 'a33bd5bb-24ec-4ef2-a62d-a3948af86d64'; // User's CricAPI key
-var CREX_BASE_URL = 'https://api.cricapi.com/v1';
+// ESPN API Configuration
+var ESPN_BASE_URL = 'https://sports.core.api.espn.com/v2/sports/cricket';
+var ESPN_SITE_URL = 'https://site.api.espn.com/apis/site/v2/sports/cricket';
+var ESPN_CDN_URL = 'https://cdn.espn.com/core/cricket';
 
 // Fantasy Point System - T20 Fantasy Cricket
 var FANTASY_POINTS = {
@@ -57,97 +58,155 @@ var FANTASY_POINTS = {
   }
 };
 
-// Fetch live matches from CREX - IPL only
+// Fetch IPL matches from ESPN
 async function fetchLiveMatches() {
   try {
-    console.log('Fetching matches with API key:', CREX_API_KEY.substring(0, 8) + '...');
-    var response = await fetch(CREX_BASE_URL + '/matches?apikey=' + CREX_API_KEY);
-    var data = await response.json();
+    console.log('Fetching IPL matches from ESPN...');
     
-    console.log('API Response:', data);
+    // Try multiple IPL league slugs
+    var iplLeagues = ['ipl', 'ipl2026', 'ipl.2026'];
+    var allMatches = [];
     
-    if (data.status === 'success') {
-      return data.data.filter(function(match) {
-        // Filter for IPL matches only
-        var isIPL = match.name && (match.name.toLowerCase().includes('ipl') || 
-                                   match.name.toLowerCase().includes('indian premier league') ||
-                                   match.series && match.series.toLowerCase().includes('ipl'));
-        return isIPL && (match.status === 'live' || match.status === 'scheduled');
-      });
+    for (var i = 0; i < iplLeagues.length; i++) {
+      try {
+        var response = await fetch(ESPN_BASE_URL + '/leagues/' + iplLeagues[i] + '/events');
+        var data = await response.json();
+        
+        if (data && data.events) {
+          var iplMatches = data.events.filter(function(match) {
+            return match.status === 'in_progress' || match.status === 'scheduled' || match.status === 'pre_game';
+          });
+          allMatches = allMatches.concat(iplMatches);
+        }
+      } catch (error) {
+        console.warn('League ' + iplLeagues[i] + ' failed:', error);
+      }
     }
-    console.warn('API returned non-success status:', data);
-    return [];
+    
+    console.log('Found ' + allMatches.length + ' IPL matches');
+    return allMatches;
   } catch (error) {
     console.error('Error fetching live matches:', error);
     return [];
   }
 }
 
-// Fetch match details with player info
+// Fetch match details
 async function fetchMatchDetails(matchId) {
   try {
-    var response = await fetch(CREX_BASE_URL + '/match_info/' + matchId + '?apikey=' + CREX_API_KEY);
+    var response = await fetch(ESPN_BASE_URL + '/leagues/ipl/events/' + matchId);
     var data = await response.json();
     
-    if (data.status === 'success') {
-      return data.data;
-    }
-    console.warn('Match details API returned:', data);
-    return null;
+    return data || null;
   } catch (error) {
     console.error('Error fetching match details:', error);
     return null;
   }
 }
 
-// Fetch live score with detailed player stats
+// Fetch live score
 async function fetchLiveScore(matchId) {
   try {
-    var response = await fetch(CREX_BASE_URL + '/match_score/' + matchId + '?apikey=' + CREX_API_KEY);
+    // Try CDN first for real-time data
+    var response = await fetch(ESPN_CDN_URL + '/game?xhr=1&gameId=' + matchId);
     var data = await response.json();
     
-    if (data.status === 'success') {
-      return data.data;
+    if (data && data.gamepackageJSON) {
+      return data.gamepackageJSON;
     }
-    console.warn('Live score API returned:', data);
-    return null;
+    
+    // Fallback to core API
+    var fallbackResponse = await fetch(ESPN_BASE_URL + '/leagues/ipl/events/' + matchId);
+    var fallbackData = await fallbackResponse.json();
+    
+    return fallbackData || null;
   } catch (error) {
     console.error('Error fetching live score:', error);
     return null;
   }
 }
 
-// Fetch match lineups with player photos
+// Fetch match lineups
 async function fetchMatchLineups(matchId) {
   try {
-    var response = await fetch(CREX_BASE_URL + '/match_lineups/' + matchId + '?apikey=' + CREX_API_KEY);
-    var data = await response.json();
-    
-    if (data.status === 'success') {
-      return data.data;
+    // Get match details to find teams
+    var matchDetails = await fetchMatchDetails(matchId);
+    if (!matchDetails || !matchDetails.competitions) {
+      console.warn('No match details found for lineup');
+      return null;
     }
-    console.warn('Lineups API returned:', data);
-    return null;
+    
+    var competition = matchDetails.competitions[0];
+    if (!competition || !competition.competitors) {
+      console.warn('No competitors found in match');
+      return null;
+    }
+    
+    // Get team rosters
+    var teamA = competition.competitors[0];
+    var teamB = competition.competitors[1];
+    
+    var teamARoster = await fetchTeamRoster(teamA.id);
+    var teamBRoster = await fetchTeamRoster(teamB.id);
+    
+    return {
+      teamA: {
+        id: teamA.id,
+        name: teamA.displayName || teamA.name,
+        players: teamARoster
+      },
+      teamB: {
+        id: teamB.id,
+        name: teamB.displayName || teamB.name,
+        players: teamBRoster
+      }
+    };
   } catch (error) {
     console.error('Error fetching lineups:', error);
     return null;
   }
 }
 
-// Fetch player info with photo
-async function fetchPlayerInfo(playerId) {
+// Fetch team roster
+async function fetchTeamRoster(teamId) {
   try {
-    var response = await fetch(CREX_BASE_URL + '/player_info/' + playerId + '?apikey=' + CREX_API_KEY);
+    var response = await fetch(ESPN_BASE_URL + '/leagues/ipl/teams/' + teamId + '/roster');
     var data = await response.json();
     
-    if (data.status === 'success') {
-      return data.data;
+    if (data && data.athletes) {
+      return data.athletes.map(function(athlete) {
+        return {
+          playerId: athlete.id,
+          name: athlete.displayName || athlete.fullName,
+          role: getRoleFromPosition(athlete.position),
+          photo: athlete.headshot || null,
+          team: teamId,
+          country: athlete.nationality || null
+        };
+      });
     }
-    return null;
+    
+    return [];
   } catch (error) {
-    console.error('Error fetching player info:', error);
-    return null;
+    console.error('Error fetching team roster:', error);
+    return [];
   }
+}
+
+// Convert ESPN position to fantasy role
+function getRoleFromPosition(position) {
+  if (!position) return 'batter';
+  
+  var pos = position.toLowerCase();
+  if (pos.includes('bowler') || pos.includes('fast') || pos.includes('spin')) {
+    return 'bowler';
+  } else if (pos.includes('wicket keeper') || pos.includes('keeper')) {
+    return 'wicket-keeper';
+  } else if (pos.includes('all-rounder') || pos.includes('all rounder')) {
+    return 'all-rounder';
+  }
+  
+  return 'batter';
 }
 
 // Calculate fantasy points for a player
@@ -287,6 +346,7 @@ async function updateMatchFantasyPoints(matchId, fantasyTeam) {
 
 // Find player stats in live score data
 function findPlayerStats(liveScore, playerId) {
+  // Search in both teams
   if (liveScore.teamA && liveScore.teamA.players) {
     var found = liveScore.teamA.players.find(function(p) { return p.playerId === playerId; });
     if (found) return found;

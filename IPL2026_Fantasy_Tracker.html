@@ -13,8 +13,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<!-- CREX Integration -->
-<script src="crex-integration.js"></script>
+<!-- ESPN Integration -->
+<script src="espn-integration.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -1064,28 +1064,30 @@ async function loadFantasyMatches() {
   var select = document.getElementById('fantasy-match-select');
   if (!select) return;
   
-  select.innerHTML = '<option value="">-- Loading IPL matches --</option>';
+  select.innerHTML = '<option value="">-- Loading IPL matches from ESPN --</option>';
   
   try {
     var matches = await fetchLiveMatches();
     
     if (!matches || matches.length === 0) {
-      select.innerHTML = '<option value="">-- No live IPL matches --</option>';
-      showAlert('fantasy-alert', 'No live IPL matches available. Check back during match time.', 'error');
+      select.innerHTML = '<option value="">-- No IPL matches found --</option>';
+      showAlert('fantasy-alert', 'No IPL matches available. Check back during match time.', 'error');
       return;
     }
     
     select.innerHTML = '<option value="">-- Select IPL Match --</option>' +
       matches.map(function(m) {
-        var status = m.status === 'live' ? '🔴 LIVE' : '⏰ SCHEDULED';
-        return '<option value="' + m.id + '">' + status + ' ' + m.name + '</option>';
+        var status = m.status === 'in_progress' ? '🔴 LIVE' : '⏰ SCHEDULED';
+        var teams = m.competitions ? m.competitions[0].competitors.map(function(c) { return c.displayName || c.name; }).join(' vs ') : 'Unknown Teams';
+        return '<option value="' + m.id + '">' + status + ' ' + teams + '</option>';
       }).join('');
       
-    console.log('Loaded ' + matches.length + ' IPL matches');
+    console.log('Loaded ' + matches.length + ' IPL matches from ESPN');
+    showAlert('fantasy-alert', 'Successfully loaded ' + matches.length + ' IPL matches from ESPN!', 'success');
   } catch (error) {
     console.error('Error loading fantasy matches:', error);
     select.innerHTML = '<option value="">-- Error loading matches --</option>';
-    showAlert('fantasy-alert', 'Error loading matches. Please try again.', 'error');
+    showAlert('fantasy-alert', 'Error loading matches from ESPN. Please try again.', 'error');
   }
 }
 
@@ -1096,18 +1098,20 @@ async function loadFantasyMatch() {
   
   fantasyTeam.matchId = matchId;
   
-  showAlert('fantasy-alert', 'Loading match data...', 'success');
+  showAlert('fantasy-alert', 'Loading match data from ESPN...', 'success');
   
   // Fetch match details and lineups
   var matchDetails = await fetchMatchDetails(matchId);
   var lineups = await fetchMatchLineups(matchId);
   
   if (matchDetails) {
-    document.getElementById('live-match-name').textContent = matchDetails.name;
-    document.getElementById('live-match-status').textContent = matchDetails.status;
+    var matchName = matchDetails.name || matchDetails.displayName || 'IPL Match';
+    var matchStatus = matchDetails.status === 'in_progress' ? '🔴 LIVE' : '⏰ SCHEDULED';
+    document.getElementById('live-match-name').textContent = matchName;
+    document.getElementById('live-match-status').textContent = matchStatus;
     document.getElementById('live-score-display').style.display = 'block';
   } else {
-    showAlert('fantasy-alert', 'Could not load match details. The match may not have started yet.', 'error');
+    showAlert('fantasy-alert', 'Could not load match details from ESPN. The match may not have started yet.', 'error');
   }
   
   if (!lineups) {
@@ -1125,7 +1129,7 @@ async function loadFantasyMatch() {
   }
   liveScoreInterval = startLiveScoreUpdates(matchId, fantasyTeam, updateFantasyLeaderboard);
   
-  showAlert('fantasy-alert', 'Match loaded successfully! Select your fantasy team.', 'success');
+  showAlert('fantasy-alert', 'Match loaded successfully from ESPN! Select your fantasy team.', 'success');
 }
 
 // Render available players for selection with photos
