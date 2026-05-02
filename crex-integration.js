@@ -57,7 +57,7 @@ var FANTASY_POINTS = {
   }
 };
 
-// Fetch live matches from CREX
+// Fetch live matches from CREX - IPL only
 async function fetchLiveMatches() {
   try {
     var response = await fetch(CREX_BASE_URL + '/matches?apikey=' + CREX_API_KEY);
@@ -65,7 +65,11 @@ async function fetchLiveMatches() {
     
     if (data.status === 'success') {
       return data.data.filter(function(match) {
-        return match.status === 'live' || match.status === 'scheduled';
+        // Filter for IPL matches only
+        var isIPL = match.name && (match.name.toLowerCase().includes('ipl') || 
+                                   match.name.toLowerCase().includes('indian premier league') ||
+                                   match.series && match.series.toLowerCase().includes('ipl'));
+        return isIPL && (match.status === 'live' || match.status === 'scheduled');
       });
     }
     return [];
@@ -75,7 +79,7 @@ async function fetchLiveMatches() {
   }
 }
 
-// Fetch match details
+// Fetch match details with player info
 async function fetchMatchDetails(matchId) {
   try {
     var response = await fetch(CREX_BASE_URL + '/match_info/' + matchId + '?apikey=' + CREX_API_KEY);
@@ -84,6 +88,7 @@ async function fetchMatchDetails(matchId) {
     if (data.status === 'success') {
       return data.data;
     }
+    console.warn('Match details API returned:', data);
     return null;
   } catch (error) {
     console.error('Error fetching match details:', error);
@@ -91,7 +96,7 @@ async function fetchMatchDetails(matchId) {
   }
 }
 
-// Fetch live score
+// Fetch live score with detailed player stats
 async function fetchLiveScore(matchId) {
   try {
     var response = await fetch(CREX_BASE_URL + '/match_score/' + matchId + '?apikey=' + CREX_API_KEY);
@@ -100,6 +105,7 @@ async function fetchLiveScore(matchId) {
     if (data.status === 'success') {
       return data.data;
     }
+    console.warn('Live score API returned:', data);
     return null;
   } catch (error) {
     console.error('Error fetching live score:', error);
@@ -107,7 +113,7 @@ async function fetchLiveScore(matchId) {
   }
 }
 
-// Fetch match lineups
+// Fetch match lineups with player photos
 async function fetchMatchLineups(matchId) {
   try {
     var response = await fetch(CREX_BASE_URL + '/match_lineups/' + matchId + '?apikey=' + CREX_API_KEY);
@@ -116,9 +122,26 @@ async function fetchMatchLineups(matchId) {
     if (data.status === 'success') {
       return data.data;
     }
+    console.warn('Lineups API returned:', data);
     return null;
   } catch (error) {
     console.error('Error fetching lineups:', error);
+    return null;
+  }
+}
+
+// Fetch player info with photo
+async function fetchPlayerInfo(playerId) {
+  try {
+    var response = await fetch(CREX_BASE_URL + '/player_info/' + playerId + '?apikey=' + CREX_API_KEY);
+    var data = await response.json();
+    
+    if (data.status === 'success') {
+      return data.data;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching player info:', error);
     return null;
   }
 }
