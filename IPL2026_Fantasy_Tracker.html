@@ -13,6 +13,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<!-- CREX Integration -->
+<script src="crex-integration.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -253,6 +255,7 @@ tr:hover td{background:rgba(255,103,31,0.03);}
   <button class="tab-btn active" onclick="showTab('dashboard',this)">&#128202; Dashboard</button>
   <button class="tab-btn" onclick="showTab('members',this)">&#128101; Members</button>
   <button class="tab-btn" onclick="showTab('entry',this)">&#9999;&#65039; Match Entry</button>
+  <button class="tab-btn" onclick="showTab('fantasy',this)">&#127942; Fantasy</button>
   <button class="tab-btn" onclick="showTab('leaderboard',this)">&#127941; Leaderboard</button>
   <button class="tab-btn" onclick="showTab('invite',this)">&#128279; Invite</button>
   <button class="tab-btn" onclick="showTab('pdf',this)">&#128196; PDF Export</button>
@@ -287,6 +290,72 @@ tr:hover td{background:rgba(255,103,31,0.03);}
         <tbody id="members-manage-list"></tbody>
       </table>
     </div>
+  </div>
+</div>
+
+<!-- FANTASY -->
+<div id="sec-fantasy" class="section">
+  <div class="card">
+    <div class="card-title">&#127942; Fantasy Cricket - Live Scores</div>
+    <div id="fantasy-alert" class="alert"></div>
+    
+    <!-- Match Selection -->
+    <div class="form-grid">
+      <div>
+        <label>Select Live Match</label>
+        <select id="fantasy-match-select" onchange="loadFantasyMatch()">
+          <option value="">-- Loading matches --</option>
+        </select>
+      </div>
+    </div>
+    
+    <!-- Live Score Display -->
+    <div id="live-score-display" style="display:none; margin-top:16px; padding:16px; background:var(--light); border-radius:10px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div>
+          <h3 id="live-match-name" style="color:var(--saffron); margin-bottom:4px;"></h3>
+          <p id="live-match-status" style="font-size:12px; color:var(--muted);"></p>
+        </div>
+        <div id="live-score" style="font-size:24px; font-weight:700; color:var(--saffron);"></div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Fantasy Team Selection -->
+  <div class="card">
+    <div class="card-title">&#128101; Select Your Fantasy Team</div>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:12px;">Select 11 players including 1 Captain (2x points) and 1 Vice-Captain (1.5x points)</p>
+    
+    <div id="fantasy-team-pool" style="margin-bottom:16px;">
+      <div style="font-weight:700;font-size:14px;color:var(--blue);margin-bottom:10px;">Available Players</div>
+      <div id="available-players-list"></div>
+    </div>
+    
+    <div id="fantasy-selected-team" style="margin-top:16px;">
+      <div style="font-weight:700;font-size:14px;color:var(--saffron);margin-bottom:10px;">Selected Team (11 players)</div>
+      <div id="selected-players-list"></div>
+    </div>
+    
+    <div style="margin-top:16px;display:flex;gap:10px;">
+      <button class="btn btn-primary" onclick="saveFantasyTeam()" style="flex:1;">&#10004; Save Fantasy Team</button>
+      <button class="btn" style="background:var(--border);" onclick="clearFantasyTeam()">Clear</button>
+    </div>
+  </div>
+  
+  <!-- Fantasy Leaderboard -->
+  <div class="card">
+    <div class="card-title">&#127942; Live Fantasy Leaderboard</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Player</th>
+          <th>Points</th>
+          <th>Role</th>
+        </tr>
+      </thead>
+      <tbody id="fantasy-leaderboard"></tbody>
+    </table>
   </div>
 </div>
 
@@ -980,6 +1049,256 @@ function removeMember(uid) {
 }
 
 // ═══════════════════════════════════════
+// FANTASY CRICKET SYSTEM
+// ═══════════════════════════════════════
+var fantasyTeam = {
+  matchId: null,
+  players: [],
+  captain: null,
+  viceCaptain: null
+};
+var liveScoreInterval = null;
+
+// Load live matches on fantasy tab open
+async function loadFantasyMatches() {
+  try {
+    var matches = await fetchLiveMatches();
+    var select = document.getElementById('fantasy-match-select');
+    if (!select) return;
+    
+    select.innerHTML = '<option value="">-- Select Match --</option>' +
+      matches.map(function(m) {
+        return '<option value="' + m.id + '">' + m.name + '</option>';
+      }).join('');
+  } catch (error) {
+    console.error('Error loading fantasy matches:', error);
+  }
+}
+
+// Load selected fantasy match
+async function loadFantasyMatch() {
+  var matchId = document.getElementById('fantasy-match-select').value;
+  if (!matchId) return;
+  
+  fantasyTeam.matchId = matchId;
+  
+  // Fetch match details and lineups
+  var matchDetails = await fetchMatchDetails(matchId);
+  var lineups = await fetchMatchLineups(matchId);
+  
+  if (matchDetails) {
+    document.getElementById('live-match-name').textContent = matchDetails.name;
+    document.getElementById('live-match-status').textContent = matchDetails.status;
+    document.getElementById('live-score-display').style.display = 'block';
+  }
+  
+  // Render available players from lineups
+  renderAvailablePlayers(lineups);
+  
+  // Start live score updates
+  if (liveScoreInterval) {
+    stopLiveScoreUpdates(liveScoreInterval);
+  }
+  liveScoreInterval = startLiveScoreUpdates(matchId, fantasyTeam, updateFantasyLeaderboard);
+}
+
+// Render available players for selection
+function renderAvailablePlayers(lineups) {
+  var container = document.getElementById('available-players-list');
+  if (!container || !lineups) return;
+  
+  var allPlayers = [];
+  
+  if (lineups.teamA && lineups.teamA.players) {
+    lineups.teamA.players.forEach(function(p) {
+      allPlayers.push({ ...p, team: lineups.teamA.name });
+    });
+  }
+  
+  if (lineups.teamB && lineups.teamB.players) {
+    lineups.teamB.players.forEach(function(p) {
+      allPlayers.push({ ...p, team: lineups.teamB.name });
+    });
+  }
+  
+  container.innerHTML = allPlayers.map(function(player, i) {
+    var isSelected = fantasyTeam.players.find(function(p) { return p.playerId === player.playerId; });
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;background:' + (isSelected ? 'var(--saffron-light)' : '#fff') + ';">' +
+      '<input type="checkbox" id="player-' + i + '" ' + (isSelected ? 'checked' : '') + ' onchange="togglePlayerSelection(\'' + player.playerId + '\', \'' + player.name + '\', \'' + player.role + '\', this.checked)"/>' +
+      '<div style="flex:1;">' +
+        '<div style="font-weight:600;">' + player.name + '</div>' +
+        '<div style="font-size:11px;color:var(--muted);">' + player.team + ' | ' + (player.role || 'Batter') + '</div>' +
+      '</div>' +
+      '<select id="role-' + player.playerId + '" style="width:100px;font-size:12px;">' +
+        '<option value="batter">Batter</option>' +
+        '<option value="bowler">Bowler</option>' +
+        '<option value="all-rounder">All-Rounder</option>' +
+        '<option value="wicket-keeper">WK</option>' +
+      '</select>' +
+    '</div>';
+  }).join('');
+}
+
+// Toggle player selection
+function togglePlayerSelection(playerId, playerName, role, isSelected) {
+  if (isSelected) {
+    if (fantasyTeam.players.length >= 11) {
+      alert('Maximum 11 players allowed!');
+      document.getElementById('player-' + playerId).checked = false;
+      return;
+    }
+    
+    fantasyTeam.players.push({
+      playerId: playerId,
+      name: playerName,
+      role: role,
+      isCaptain: false,
+      isViceCaptain: false,
+      inLineup: true
+    });
+  } else {
+    fantasyTeam.players = fantasyTeam.players.filter(function(p) { return p.playerId !== playerId; });
+    
+    // Reset captain/vice-captain if removed
+    if (fantasyTeam.captain === playerId) fantasyTeam.captain = null;
+    if (fantasyTeam.viceCaptain === playerId) fantasyTeam.viceCaptain = null;
+  }
+  
+  renderSelectedTeam();
+}
+
+// Render selected fantasy team
+function renderSelectedTeam() {
+  var container = document.getElementById('selected-players-list');
+  if (!container) return;
+  
+  container.innerHTML = fantasyTeam.players.map(function(player, i) {
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--saffron);border-radius:8px;margin-bottom:6px;background:var(--saffron-light);">' +
+      '<div style="flex:1;">' +
+        '<div style="font-weight:600;">' + player.name + (player.isCaptain ? ' &#127942;' : '') + (player.isViceCaptain ? ' &#127891;' : '') + '</div>' +
+        '<div style="font-size:11px;color:var(--muted);">' + player.role + '</div>' +
+      '</div>' +
+      '<button class="btn btn-sm" onclick="setCaptain(\'' + player.playerId + '\')" style="background:' + (player.isCaptain ? 'var(--saffron)' : 'var(--border)') + ';color:' + (player.isCaptain ? '#fff' : 'var(--text)') + ';">C</button>' +
+      '<button class="btn btn-sm" onclick="setViceCaptain(\'' + player.playerId + '\')" style="background:' + (player.isViceCaptain ? 'var(--saffron)' : 'var(--border)') + ';color:' + (player.isViceCaptain ? '#fff' : 'var(--text)') + ';">VC</button>' +
+      '<button class="btn btn-sm btn-danger" onclick="removePlayerFromTeam(\'' + player.playerId + '\')">&#10005;</button>' +
+    '</div>';
+  }).join('');
+}
+
+// Set captain
+function setCaptain(playerId) {
+  // Reset existing captain
+  fantasyTeam.players.forEach(function(p) { p.isCaptain = false; });
+  
+  // Set new captain
+  var player = fantasyTeam.players.find(function(p) { return p.playerId === playerId; });
+  if (player) {
+    player.isCaptain = true;
+    fantasyTeam.captain = playerId;
+    
+    // Clear vice-captain if same as captain
+    if (fantasyTeam.viceCaptain === playerId) {
+      fantasyTeam.viceCaptain = null;
+      fantasyTeam.players.forEach(function(p) { p.isViceCaptain = false; });
+    }
+  }
+  
+  renderSelectedTeam();
+}
+
+// Set vice-captain
+function setViceCaptain(playerId) {
+  // Reset existing vice-captain
+  fantasyTeam.players.forEach(function(p) { p.isViceCaptain = false; });
+  
+  // Set new vice-captain
+  var player = fantasyTeam.players.find(function(p) { return p.playerId === playerId; });
+  if (player && playerId !== fantasyTeam.captain) {
+    player.isViceCaptain = true;
+    fantasyTeam.viceCaptain = playerId;
+  }
+  
+  renderSelectedTeam();
+}
+
+// Remove player from team
+function removePlayerFromTeam(playerId) {
+  fantasyTeam.players = fantasyTeam.players.filter(function(p) { return p.playerId !== playerId; });
+  
+  if (fantasyTeam.captain === playerId) fantasyTeam.captain = null;
+  if (fantasyTeam.viceCaptain === playerId) fantasyTeam.viceCaptain = null;
+  
+  renderSelectedTeam();
+  
+  // Uncheck in available players
+  var checkbox = document.getElementById('player-' + playerId);
+  if (checkbox) checkbox.checked = false;
+}
+
+// Save fantasy team
+function saveFantasyTeam() {
+  if (fantasyTeam.players.length !== 11) {
+    alert('Please select exactly 11 players!');
+    return;
+  }
+  
+  if (!fantasyTeam.captain) {
+    alert('Please select a Captain!');
+    return;
+  }
+  
+  if (!fantasyTeam.viceCaptain) {
+    alert('Please select a Vice-Captain!');
+    return;
+  }
+  
+  // Save to state
+  var g = state.groups[state.activeGroup];
+  if (!g) return;
+  
+  g.fantasyTeam = fantasyTeam;
+  save();
+  saveGroupToCloud(state.activeGroup);
+  
+  showAlert('fantasy-alert', 'Fantasy team saved! Live tracking started.', 'success');
+}
+
+// Clear fantasy team
+function clearFantasyTeam() {
+  fantasyTeam = {
+    matchId: null,
+    players: [],
+    captain: null,
+    viceCaptain: null
+  };
+  
+  renderSelectedTeam();
+  
+  var g = state.groups[state.activeGroup];
+  if (g) {
+    g.fantasyTeam = null;
+    save();
+  }
+}
+
+// Update fantasy leaderboard
+function updateFantasyLeaderboard(fantasyData) {
+  var container = document.getElementById('fantasy-leaderboard');
+  if (!container || !fantasyData) return;
+  
+  var sortedPlayers = Object.values(fantasyData).sort(function(a, b) { return b.points - a.points; });
+  
+  container.innerHTML = sortedPlayers.map(function(player, i) {
+    return '<tr>' +
+      '<td>' + (i + 1) + '</td>' +
+      '<td>' + player.name + (player.isCaptain ? ' &#127942;' : '') + (player.isViceCaptain ? ' &#127891;' : '') + '</td>' +
+      '<td><b>' + player.points.toFixed(1) + '</b></td>' +
+      '<td>' + player.role + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+// ═══════════════════════════════════════
 // GROUPS PAGE
 // ═══════════════════════════════════════
 function initGroupsPage(){
@@ -1088,6 +1407,11 @@ function showTab(id,btn){
   document.querySelectorAll('.tab-btn').forEach(function(b){b.classList.remove('active');});
   if(btn)btn.classList.add('active');
   renderAll();
+  
+  // Load fantasy matches when fantasy tab is opened
+  if(id === 'fantasy') {
+    loadFantasyMatches();
+  }
 }
 function showAlert(id,msg,type){var e=document.getElementById(id);e.textContent=msg;e.className='alert alert-'+type;e.style.display='block';setTimeout(function(){e.style.display='none';},3000);}
 
